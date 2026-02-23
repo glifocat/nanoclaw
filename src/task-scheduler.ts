@@ -183,24 +183,14 @@ async function runTask(
     error,
   });
 
-  let nextRun: string | null = null;
-  if (task.schedule_type === 'cron') {
-    const interval = CronExpressionParser.parse(task.schedule_value, {
-      tz: TIMEZONE,
-    });
-    nextRun = interval.next().toISOString();
-  } else if (task.schedule_type === 'interval') {
-    const ms = parseInt(task.schedule_value, 10);
-    nextRun = new Date(Date.now() + ms).toISOString();
-  }
-  // 'once' tasks have no next run
-
   const resultSummary = error
     ? `Error: ${error}`
     : result
       ? result.slice(0, 200)
       : 'Completed';
-  updateTaskAfterRun(task.id, nextRun, resultSummary);
+  // next_run was already advanced before execution (see scheduler loop);
+  // just record the run result and last_run timestamp.
+  updateTaskAfterRun(task.id, null, resultSummary);
 }
 
 let schedulerRunning = false;
