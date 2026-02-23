@@ -43,13 +43,18 @@ function runJxa(script: string): Promise<string> {
 export async function listRemindersLists(): Promise<RemindersResult> {
   try {
     const script = `
-      const app = Application("Reminders");
-      const lists = app.lists();
-      const result = lists.map(l => ({
-        name: l.name(),
-        count: l.reminders.whose({ completed: false })().length
-      }));
-      return JSON.stringify(result);
+      var app = Application("Reminders");
+      var lists = app.lists();
+      var result = [];
+      for (var i = 0; i < lists.length; i++) {
+        var completed = lists[i].reminders.completed();
+        var count = 0;
+        for (var j = 0; j < completed.length; j++) {
+          if (!completed[j]) count++;
+        }
+        result.push({ name: lists[i].name(), count: count });
+      }
+      JSON.stringify(result);
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
@@ -70,17 +75,25 @@ export async function listRemindersItems(
 ): Promise<RemindersResult> {
   try {
     const script = `
-      const app = Application("Reminders");
-      const list = app.lists.byName(${JSON.stringify(listName)});
+      var app = Application("Reminders");
+      var list = app.lists.byName(${JSON.stringify(listName)});
       if (!list.exists()) { throw new Error("List not found: " + ${JSON.stringify(listName)}); }
-      const items = ${includeCompleted ? 'list.reminders()' : 'list.reminders.whose({ completed: false })()'};
-      const result = items.map(r => ({
-        name: r.name(),
-        completed: r.completed(),
-        dueDate: r.dueDate() ? r.dueDate().toISOString() : null,
-        body: r.body() || null,
-      }));
-      return JSON.stringify(result);
+      var names = list.reminders.name();
+      var completedArr = list.reminders.completed();
+      var dueDates = list.reminders.dueDate();
+      var bodies = list.reminders.body();
+      var result = [];
+      for (var i = 0; i < names.length; i++) {
+        if (${includeCompleted} || !completedArr[i]) {
+          result.push({
+            name: names[i],
+            completed: completedArr[i],
+            dueDate: dueDates[i] ? dueDates[i].toISOString() : null,
+            body: bodies[i] || null
+          });
+        }
+      }
+      JSON.stringify(result);
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
@@ -111,14 +124,14 @@ export async function addRemindersItem(
     if (notes) props.body = notes;
 
     const script = `
-      const app = Application("Reminders");
-      const list = app.lists.byName(${JSON.stringify(listName)});
+      var app = Application("Reminders");
+      var list = app.lists.byName(${JSON.stringify(listName)});
       if (!list.exists()) { throw new Error("List not found: " + ${JSON.stringify(listName)}); }
-      const props = ${JSON.stringify(props)};
+      var props = ${JSON.stringify(props)};
       ${dueDate ? `props.dueDate = new Date(${JSON.stringify(dueDate)});` : ''}
-      const r = app.Reminder(props);
+      var r = app.Reminder(props);
       list.reminders.push(r);
-      return JSON.stringify({ name: r.name(), dueDate: r.dueDate() ? r.dueDate().toISOString() : null });
+      JSON.stringify({ name: r.name(), dueDate: r.dueDate() ? r.dueDate().toISOString() : null });
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
@@ -143,13 +156,19 @@ export async function completeRemindersItem(
 ): Promise<RemindersResult> {
   try {
     const script = `
-      const app = Application("Reminders");
-      const list = app.lists.byName(${JSON.stringify(listName)});
+      var app = Application("Reminders");
+      var list = app.lists.byName(${JSON.stringify(listName)});
       if (!list.exists()) { throw new Error("List not found: " + ${JSON.stringify(listName)}); }
-      const items = list.reminders.whose({ name: ${JSON.stringify(itemTitle)}, completed: false })();
-      if (items.length === 0) { throw new Error("Item not found: " + ${JSON.stringify(itemTitle)}); }
-      items[0].completed = true;
-      return JSON.stringify({ name: items[0].name(), completed: true });
+      var names = list.reminders.name();
+      var completedArr = list.reminders.completed();
+      var rems = list.reminders();
+      var found = null;
+      for (var i = 0; i < names.length; i++) {
+        if (names[i] === ${JSON.stringify(itemTitle)} && !completedArr[i]) { found = rems[i]; break; }
+      }
+      if (!found) { throw new Error("Item not found: " + ${JSON.stringify(itemTitle)}); }
+      found.completed = true;
+      JSON.stringify({ name: found.name(), completed: true });
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
@@ -174,13 +193,18 @@ export async function removeRemindersItem(
 ): Promise<RemindersResult> {
   try {
     const script = `
-      const app = Application("Reminders");
-      const list = app.lists.byName(${JSON.stringify(listName)});
+      var app = Application("Reminders");
+      var list = app.lists.byName(${JSON.stringify(listName)});
       if (!list.exists()) { throw new Error("List not found: " + ${JSON.stringify(listName)}); }
-      const items = list.reminders.whose({ name: ${JSON.stringify(itemTitle)} })();
-      if (items.length === 0) { throw new Error("Item not found: " + ${JSON.stringify(itemTitle)}); }
-      app.delete(items[0]);
-      return JSON.stringify({ deleted: ${JSON.stringify(itemTitle)} });
+      var names = list.reminders.name();
+      var rems = list.reminders();
+      var found = null;
+      for (var i = 0; i < names.length; i++) {
+        if (names[i] === ${JSON.stringify(itemTitle)}) { found = rems[i]; break; }
+      }
+      if (!found) { throw new Error("Item not found: " + ${JSON.stringify(itemTitle)}); }
+      app.delete(found);
+      JSON.stringify({ deleted: ${JSON.stringify(itemTitle)} });
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
