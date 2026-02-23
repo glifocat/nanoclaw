@@ -126,7 +126,7 @@ Groups are registered in `/workspace/project/data/registered_groups.json`:
   "1234567890-1234567890@g.us": {
     "name": "Family Chat",
     "folder": "family-chat",
-    "trigger": "@Andy",
+    "trigger": "@Gambi",
     "added_at": "2024-01-31T12:00:00.000Z"
   }
 }
@@ -169,7 +169,7 @@ Groups can have extra directories mounted. Add `containerConfig` to their entry:
   "1234567890@g.us": {
     "name": "Dev Team",
     "folder": "dev-team",
-    "trigger": "@Andy",
+    "trigger": "@Gambi",
     "added_at": "2026-01-31T12:00:00Z",
     "containerConfig": {
       "additionalMounts": [
@@ -199,9 +199,18 @@ Read `/workspace/project/data/registered_groups.json` and format it nicely.
 
 ---
 
-## Global Memory
+## Memory Structure
 
+### Global Memory
 You can read and write to `/workspace/project/groups/global/CLAUDE.md` for facts that should apply to all groups. Only update global memory when explicitly asked to "remember this globally" or similar.
+
+### Personal/Family Context
+For personal and family-related topics, always consult:
+- `/workspace/project/groups/casa/family.md` - Family members and important dates
+- `/workspace/project/groups/casa/alimentacion.md` - Diet, food preferences, and restrictions
+- `/workspace/project/groups/casa/menu-semanal.md` - Weekly meal planning
+
+This context is stored in the "casa" group to keep it private and separate from work-related groups.
 
 ---
 

@@ -47,6 +47,13 @@ When you learn something important:
 - Split files larger than 500 lines into folders
 - Keep an index in your memory for the files you create
 
+## User Context
+
+- **Location**: Cornellá de Llobregat, España
+- **Culture**: Spanish/Catalan context
+- Always consider local customs, schedules, and cultural norms when making suggestions
+- Avoid anglophone/US-centric assumptions
+
 ## Message Formatting
 
 NEVER use markdown. Only use WhatsApp/Telegram formatting:

@@ -19,7 +19,10 @@ Single Node.js process that connects to WhatsApp, routes messages to Claude Agen
 | `src/task-scheduler.ts` | Runs scheduled tasks |
 | `src/db.ts` | SQLite operations |
 | `groups/{name}/CLAUDE.md` | Per-group memory (isolated) |
-| `container/skills/agent-browser.md` | Browser automation tool (available to all agents via Bash) |
+| `src/container-runtime.ts` | Apple Container / Docker runtime abstraction |
+| `src/group-queue.ts` | Per-group message queue with concurrency control |
+| `src/transcription.ts` | Voice message transcription (whisper-cli) |
+| `container/skills/agent-browser/SKILL.md` | Browser automation tool (available to all agents via Bash) |
 
 ## Skills
 
@@ -36,6 +39,8 @@ Run commands directly—don't tell the user to run them.
 ```bash
 npm run dev          # Run with hot reload
 npm run build        # Compile TypeScript
+npm test             # Run tests (vitest)
+npm run typecheck    # Type-check without emitting
 ./container/build.sh # Rebuild agent container
 ```
 
