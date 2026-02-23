@@ -33,6 +33,8 @@ export class WhatsAppChannel implements Channel {
 
   private sock!: WASocket;
   private connected = false;
+  private reconnecting = false;
+  private reconnectAttempts = 0;
   private lidToPhoneMap: Record<string, string> = {};
   private outgoingQueue: Array<{ jid: string; text: string }> = [];
   private flushing = false;
@@ -51,6 +53,14 @@ export class WhatsAppChannel implements Channel {
   }
 
   private async connectInternal(onFirstOpen?: () => void): Promise<void> {
+    // Clean up previous socket to prevent listener accumulation
+    if (this.sock) {
+      this.sock.ev.removeAllListeners('connection.update');
+      this.sock.ev.removeAllListeners('creds.update');
+      this.sock.ev.removeAllListeners('messages.upsert');
+      this.sock.end(undefined);
+    }
+
     const authDir = path.join(STORE_DIR, 'auth');
     fs.mkdirSync(authDir, { recursive: true });
 
@@ -86,21 +96,15 @@ export class WhatsAppChannel implements Channel {
         logger.info({ reason, shouldReconnect, queuedMessages: this.outgoingQueue.length }, 'Connection closed');
 
         if (shouldReconnect) {
-          logger.info('Reconnecting...');
-          this.connectInternal().catch((err) => {
-            logger.error({ err }, 'Failed to reconnect, retrying in 5s');
-            setTimeout(() => {
-              this.connectInternal().catch((err2) => {
-                logger.error({ err: err2 }, 'Reconnection retry failed');
-              });
-            }, 5000);
-          });
+          this.scheduleReconnect();
         } else {
           logger.info('Logged out. Run /setup to re-authenticate.');
           process.exit(0);
         }
       } else if (connection === 'open') {
         this.connected = true;
+        this.reconnecting = false;
+        this.reconnectAttempts = 0;
         logger.info('Connected to WhatsApp');
 
         // Announce availability so WhatsApp relays subsequent presence updates (typing indicators)
@@ -214,6 +218,28 @@ export class WhatsAppChannel implements Channel {
         }
       }
     });
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnecting) {
+      logger.debug('Reconnection already scheduled, skipping');
+      return;
+    }
+    this.reconnecting = true;
+    this.reconnectAttempts++;
+
+    // Exponential backoff: 2s, 4s, 8s, 16s, 30s, 30s, ...
+    const baseDelay = 2000;
+    const delay = Math.min(baseDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
+    logger.info({ attempt: this.reconnectAttempts, delayMs: delay }, 'Scheduling reconnect');
+
+    setTimeout(() => {
+      this.reconnecting = false;
+      this.connectInternal().catch((err) => {
+        logger.error({ err }, 'Reconnection failed');
+        this.scheduleReconnect();
+      });
+    }, delay);
   }
 
   async sendMessage(jid: string, text: string): Promise<void> {
