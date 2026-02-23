@@ -49,7 +49,7 @@ export async function listRemindersLists(): Promise<RemindersResult> {
         name: l.name(),
         count: l.reminders.whose({ completed: false })().length
       }));
-      JSON.stringify(result);
+      return JSON.stringify(result);
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
@@ -80,7 +80,7 @@ export async function listRemindersItems(
         dueDate: r.dueDate() ? r.dueDate().toISOString() : null,
         body: r.body() || null,
       }));
-      JSON.stringify(result);
+      return JSON.stringify(result);
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
@@ -118,7 +118,7 @@ export async function addRemindersItem(
       ${dueDate ? `props.dueDate = new Date(${JSON.stringify(dueDate)});` : ''}
       const r = app.Reminder(props);
       list.reminders.push(r);
-      JSON.stringify({ name: r.name(), dueDate: r.dueDate() ? r.dueDate().toISOString() : null });
+      return JSON.stringify({ name: r.name(), dueDate: r.dueDate() ? r.dueDate().toISOString() : null });
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
@@ -149,7 +149,7 @@ export async function completeRemindersItem(
       const items = list.reminders.whose({ name: ${JSON.stringify(itemTitle)}, completed: false })();
       if (items.length === 0) { throw new Error("Item not found: " + ${JSON.stringify(itemTitle)}); }
       items[0].completed = true;
-      JSON.stringify({ name: items[0].name(), completed: true });
+      return JSON.stringify({ name: items[0].name(), completed: true });
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
@@ -180,7 +180,7 @@ export async function removeRemindersItem(
       const items = list.reminders.whose({ name: ${JSON.stringify(itemTitle)} })();
       if (items.length === 0) { throw new Error("Item not found: " + ${JSON.stringify(itemTitle)}); }
       app.delete(items[0]);
-      JSON.stringify({ deleted: ${JSON.stringify(itemTitle)} });
+      return JSON.stringify({ deleted: ${JSON.stringify(itemTitle)} });
     `;
     const raw = await runJxa(script);
     const data = JSON.parse(raw);
