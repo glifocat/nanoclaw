@@ -280,6 +280,166 @@ Use available_groups.json to find the JID for a group. The folder name should be
   },
 );
 
+// ---------------------------------------------------------------------------
+// Apple Reminders tools
+// ---------------------------------------------------------------------------
+
+const REMINDERS_RESULTS_DIR = path.join(IPC_DIR, 'reminders_results');
+
+async function waitForRemindersResult(
+  requestId: string,
+  maxWait = 15000,
+): Promise<{ success: boolean; message: string; data?: unknown }> {
+  const resultFile = path.join(REMINDERS_RESULTS_DIR, `${requestId}.json`);
+  const pollInterval = 500;
+  let elapsed = 0;
+
+  while (elapsed < maxWait) {
+    if (fs.existsSync(resultFile)) {
+      try {
+        const result = JSON.parse(fs.readFileSync(resultFile, 'utf-8'));
+        fs.unlinkSync(resultFile);
+        return result;
+      } catch (err) {
+        return { success: false, message: `Failed to read result: ${err}` };
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    elapsed += pollInterval;
+  }
+
+  return { success: false, message: 'Reminders request timed out (15s)' };
+}
+
+server.tool(
+  'reminders_list_lists',
+  'List all Apple Reminders lists with their incomplete item counts.',
+  {},
+  async () => {
+    const requestId = `rem-lists-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, {
+      type: 'reminders_list_lists',
+      requestId,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await waitForRemindersResult(requestId);
+    return {
+      content: [{ type: 'text' as const, text: result.success ? JSON.stringify(result.data, null, 2) : result.message }],
+      isError: !result.success,
+    };
+  },
+);
+
+server.tool(
+  'reminders_list_items',
+  'List items in a specific Apple Reminders list. By default shows only incomplete items.',
+  {
+    list_name: z.string().describe('The name of the Reminders list (e.g., "Compra (Súper)")'),
+    include_completed: z.boolean().optional().default(false).describe('Whether to include completed items'),
+  },
+  async (args) => {
+    const requestId = `rem-items-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, {
+      type: 'reminders_list_items',
+      requestId,
+      listName: args.list_name,
+      includeCompleted: args.include_completed,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await waitForRemindersResult(requestId);
+    return {
+      content: [{ type: 'text' as const, text: result.success ? JSON.stringify(result.data, null, 2) : result.message }],
+      isError: !result.success,
+    };
+  },
+);
+
+server.tool(
+  'reminders_add_item',
+  'Add a new item to an Apple Reminders list.',
+  {
+    list_name: z.string().describe('The name of the Reminders list (e.g., "Compra (Súper)")'),
+    title: z.string().describe('The title of the new reminder item'),
+    notes: z.string().optional().describe('Optional notes/body for the reminder'),
+    due_date: z.string().optional().describe('Optional due date in ISO 8601 format (e.g., "2026-02-23T09:00:00")'),
+  },
+  async (args) => {
+    const requestId = `rem-add-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, {
+      type: 'reminders_add_item',
+      requestId,
+      listName: args.list_name,
+      title: args.title,
+      notes: args.notes,
+      dueDate: args.due_date,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await waitForRemindersResult(requestId);
+    return {
+      content: [{ type: 'text' as const, text: result.message }],
+      isError: !result.success,
+    };
+  },
+);
+
+server.tool(
+  'reminders_complete_item',
+  'Mark a reminder item as completed in an Apple Reminders list.',
+  {
+    list_name: z.string().describe('The name of the Reminders list (e.g., "Compra (Súper)")'),
+    item_title: z.string().describe('The exact title of the reminder item to complete'),
+  },
+  async (args) => {
+    const requestId = `rem-done-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, {
+      type: 'reminders_complete_item',
+      requestId,
+      listName: args.list_name,
+      itemTitle: args.item_title,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await waitForRemindersResult(requestId);
+    return {
+      content: [{ type: 'text' as const, text: result.message }],
+      isError: !result.success,
+    };
+  },
+);
+
+server.tool(
+  'reminders_remove_item',
+  'Remove (delete) a reminder item from an Apple Reminders list.',
+  {
+    list_name: z.string().describe('The name of the Reminders list (e.g., "Compra (Súper)")'),
+    item_title: z.string().describe('The exact title of the reminder item to remove'),
+  },
+  async (args) => {
+    const requestId = `rem-del-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    writeIpcFile(TASKS_DIR, {
+      type: 'reminders_remove_item',
+      requestId,
+      listName: args.list_name,
+      itemTitle: args.item_title,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await waitForRemindersResult(requestId);
+    return {
+      content: [{ type: 'text' as const, text: result.message }],
+      isError: !result.success,
+    };
+  },
+);
+
 // Start the stdio transport
 const transport = new StdioServerTransport();
 await server.connect(transport);

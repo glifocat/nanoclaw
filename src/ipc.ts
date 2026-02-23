@@ -14,6 +14,7 @@ import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
 import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
 import { RegisteredGroup } from './types.js';
+import { handleRemindersIpc } from './reminders-ipc.js';
 
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
@@ -381,7 +382,11 @@ export async function processTaskIpc(
       }
       break;
 
-    default:
-      logger.warn({ type: data.type }, 'Unknown IPC task type');
+    default: {
+      const handled = await handleRemindersIpc(data as Record<string, unknown>, sourceGroup, isMain, DATA_DIR);
+      if (!handled) {
+        logger.warn({ type: data.type }, 'Unknown IPC task type');
+      }
+    }
   }
 }
