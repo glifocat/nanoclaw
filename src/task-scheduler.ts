@@ -15,6 +15,7 @@ import {
   getDueTasks,
   getTaskById,
   logTaskRun,
+  recordTaskResult,
   updateTask,
   updateTaskAfterRun,
 } from './db.js';
@@ -124,11 +125,28 @@ async function runTask(
     }, TASK_CLOSE_DELAY_MS);
   };
 
+  // Inject the current local date (with day of week) into the prompt so the
+  // agent doesn't have to calculate it — LLMs frequently miscalculate day-of-week.
+  const now = new Date();
+  const localDate = now.toLocaleDateString('es-ES', {
+    timeZone: TIMEZONE,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const localTime = now.toLocaleTimeString('es-ES', {
+    timeZone: TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const datePrefix = `[Current date and time: ${localDate}, ${localTime}]\n\n`;
+
   try {
     const output = await runContainerAgent(
       group,
       {
-        prompt: task.prompt,
+        prompt: datePrefix + task.prompt,
         sessionId,
         groupFolder: task.group_folder,
         chatJid: task.chat_jid,
@@ -188,9 +206,13 @@ async function runTask(
     : result
       ? result.slice(0, 200)
       : 'Completed';
-  // next_run was already advanced before execution (see scheduler loop);
-  // just record the run result and last_run timestamp.
-  updateTaskAfterRun(task.id, null, resultSummary);
+  // next_run was already advanced before execution (see scheduler loop).
+  // For 'once' tasks, mark completed; for recurring, just record the result.
+  if (task.schedule_type === 'once') {
+    updateTaskAfterRun(task.id, null, resultSummary);
+  } else {
+    recordTaskResult(task.id, resultSummary);
+  }
 }
 
 let schedulerRunning = false;
@@ -216,6 +238,23 @@ export function startSchedulerLoop(deps: SchedulerDependencies): void {
         if (!currentTask || currentTask.status !== 'active') {
           continue;
         }
+
+        // Advance next_run BEFORE enqueuing to prevent duplicate runs.
+        // Without this, subsequent polls find the same task "due" while
+        // it's still executing (race condition: issue #138).
+        let nextRun: string | null = null;
+        if (currentTask.schedule_type === 'cron') {
+          const interval = CronExpressionParser.parse(currentTask.schedule_value, {
+            tz: TIMEZONE,
+          });
+          nextRun = interval.next().toISOString();
+        } else if (currentTask.schedule_type === 'interval') {
+          const ms = parseInt(currentTask.schedule_value, 10);
+          nextRun = new Date(Date.now() + ms).toISOString();
+        }
+        // 'once' tasks: nextRun stays null → getDueTasks skips them
+        // (query requires next_run IS NOT NULL)
+        updateTask(currentTask.id, { next_run: nextRun });
 
         deps.queue.enqueueTask(
           currentTask.chat_jid,

@@ -448,6 +448,17 @@ export function updateTaskAfterRun(
   ).run(nextRun, now, lastResult, nextRun, id);
 }
 
+/**
+ * Record task result without touching next_run or status.
+ * Used by recurring tasks whose next_run is advanced before execution.
+ */
+export function recordTaskResult(id: string, lastResult: string): void {
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE scheduled_tasks SET last_run = ?, last_result = ? WHERE id = ?`,
+  ).run(now, lastResult, id);
+}
+
 export function logTaskRun(log: TaskRunLog): void {
   db.prepare(
     `
