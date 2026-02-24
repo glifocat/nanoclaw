@@ -94,7 +94,7 @@ nanoclaw/
 ├── README.md                      # User documentation
 ├── package.json                   # Node.js dependencies
 ├── tsconfig.json                  # TypeScript configuration
-├── .mcp.json                      # MCP server configuration (reference)
+├── .mcp.json                      # MCP server configuration (root reference; per-group configs in groups/{name}/.mcp.json)
 ├── .gitignore
 │
 ├── src/
@@ -459,9 +459,17 @@ From main channel:
 
 ## MCP Servers
 
+### Per-Group MCP Servers
+
+Groups can have custom MCP servers configured in `groups/{name}/.mcp.json`. This file is mounted at `/workspace/group/.mcp.json` inside the container and auto-detected by the Claude Agent SDK.
+
+**Important:** The SDK loads MCP servers from `.mcp.json`, NOT from `settings.json`. The `settingSources` option in `query()` loads env vars, permissions, and hooks from `settings.json`, but not MCP server configs.
+
+See `groups/main/nanoclaw-mcp-best-practices.md` for configuration patterns and examples.
+
 ### NanoClaw MCP (built-in)
 
-The `nanoclaw` MCP server is created dynamically per agent call with the current group's context.
+The `nanoclaw` MCP server is created dynamically per agent call with the current group's context. Unlike per-group MCP servers, this one is passed programmatically via the `mcpServers` parameter in `query()`.
 
 **Available Tools:**
 | Tool | Purpose |

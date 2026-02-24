@@ -36,7 +36,7 @@ ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 RUN pip3 install --no-cache-dir uv --break-system-packages
 
 # Install agent-browser and claude-code globally
-RUN npm install -g agent-browser @anthropic-ai/claude-code
+RUN npm install -g agent-browser @anthropic-ai/claude-code @vantasdk/vanta-mcp-server
 
 # Create app directory
 WORKDIR /app
