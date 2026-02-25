@@ -1,0 +1,21 @@
+skills:
+  - add-pdf-reader
+  - add-voice-transcription
+apply_order:
+  - add-pdf-reader
+  - add-voice-transcription
+resolved_at: 2026-02-25T17:47:54.289Z
+tested: true
+test_passed: true
+resolution_source: generated
+input_hashes: {}
+output_hash: ""
+file_hashes:
+  src/channels/whatsapp.ts:
+    base: 7f61e863080fd93640cbccea7ede9d1281bf2b56b9283c0b8d261f04a27804a0
+    current: 7aff8e290a024e8f7c06fdec94a1b09c06b04263786b0035af00b7f0e84e0448
+    skill: 8d076e62e52e1399e02c0a17977db2f303fbbdcc57987cfe70b7fbcf016f8bee
+  src/channels/whatsapp.test.ts:
+    base: b347858d0d1eab93cddeb828b2d7f9aa2f6cb871fd98270c01904c1e00b78c2c
+    current: 5b9a3f38c1230d6fd5eb445f5b4283c6c66d020954c7d5a8b1e00c6a6b8f969f
+    skill: 3afcb0d81c7f1a40ada1737ea64b4d308e6298c8c2713ebddcaa5364ca46d2af
