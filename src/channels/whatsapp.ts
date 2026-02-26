@@ -159,6 +159,7 @@ export class WhatsAppChannel implements Channel {
 
     this.sock.ev.on('messages.upsert', async ({ messages }) => {
       for (const msg of messages) {
+        try {
         if (!msg.message) continue;
         const rawJid = msg.key.remoteJid;
         if (!rawJid || rawJid === 'status@broadcast') continue;
@@ -166,9 +167,11 @@ export class WhatsAppChannel implements Channel {
         // Translate LID JID to phone JID if applicable
         const chatJid = await this.translateJid(rawJid);
 
-        const timestamp = new Date(
-          Number(msg.messageTimestamp) * 1000,
-        ).toISOString();
+        // Use local time without Z suffix — must match format in DB and router state cursor.
+        // toISOString() returns UTC with Z, which breaks the string-comparison-based
+        // message loop since existing timestamps are stored in local time.
+        const msgDate = new Date(Number(msg.messageTimestamp) * 1000);
+        const timestamp = `${msgDate.getFullYear()}-${String(msgDate.getMonth() + 1).padStart(2, '0')}-${String(msgDate.getDate()).padStart(2, '0')}T${String(msgDate.getHours()).padStart(2, '0')}:${String(msgDate.getMinutes()).padStart(2, '0')}:${String(msgDate.getSeconds()).padStart(2, '0')}`;
 
         // Always notify about chat metadata for group discovery
         const isGroup = chatJid.endsWith('@g.us');
@@ -223,6 +226,9 @@ export class WhatsAppChannel implements Channel {
             is_from_me: fromMe,
             is_bot_message: isBotMessage,
           });
+        }
+        } catch (handlerErr) {
+          logger.error({ err: handlerErr, rawJid: msg.key.remoteJid }, 'Unhandled error in message handler');
         }
       }
     });
