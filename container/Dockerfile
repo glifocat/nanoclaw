@@ -3,7 +3,7 @@
 
 FROM node:22-slim
 
-# Install system dependencies for Chromium and Python-based MCP servers
+# Install system dependencies for Chromium, PDF tools, and Python-based MCP servers
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     libxshmfence1 \
     curl \
     git \
+    poppler-utils \
     python3 \
     python3-pip \
     python3-venv \
@@ -37,6 +38,10 @@ RUN pip3 install --no-cache-dir uv --break-system-packages
 
 # Install agent-browser and claude-code globally
 RUN npm install -g agent-browser @anthropic-ai/claude-code @vantasdk/vanta-mcp-server
+
+# Install pdf-reader CLI tool
+COPY skills/pdf-reader/pdf-reader /usr/local/bin/pdf-reader
+RUN chmod +x /usr/local/bin/pdf-reader
 
 # Create app directory
 WORKDIR /app

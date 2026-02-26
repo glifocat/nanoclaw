@@ -10,14 +10,16 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
 
-import { ASSISTANT_HAS_OWN_NUMBER, ASSISTANT_NAME, STORE_DIR } from '../config.js';
+import { ASSISTANT_HAS_OWN_NUMBER, ASSISTANT_NAME, GROUPS_DIR, STORE_DIR } from '../config.js';
 import {
   getLastGroupSync,
   setLastGroupSync,
   updateChatName,
 } from '../db.js';
 import { logger } from '../logger.js';
+import { isImageMessage, processImage } from '../image.js';
 import { isVoiceMessage, transcribeAudioMessage } from '../transcription.js';
 import { Channel, OnInboundMessage, OnChatMetadata, RegisteredGroup } from '../types.js';
 
@@ -180,12 +182,72 @@ export class WhatsAppChannel implements Channel {
         // Only deliver full message for registered groups
         const groups = this.opts.registeredGroups();
         if (groups[chatJid]) {
-          const content =
+          let content =
             msg.message?.conversation ||
             msg.message?.extendedTextMessage?.text ||
             msg.message?.imageMessage?.caption ||
             msg.message?.videoMessage?.caption ||
             '';
+
+          // Download PDF attachments to group workspace
+          const docMsg = msg.message?.documentMessage;
+          if (docMsg?.mimetype === 'application/pdf') {
+            try {
+              const buffer = (await downloadMediaMessage(
+                msg,
+                'buffer',
+                {},
+                { logger: console as any, reuploadRequest: this.sock.updateMediaMessage },
+              )) as Buffer;
+
+              if (buffer && buffer.length > 0) {
+                const group = groups[chatJid];
+                const attachDir = path.join(GROUPS_DIR, group.folder, 'attachments');
+                fs.mkdirSync(attachDir, { recursive: true });
+                const filename = docMsg.fileName || `document-${Date.now()}.pdf`;
+                const safeName = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+                const filePath = path.join(attachDir, safeName);
+                fs.writeFileSync(filePath, buffer);
+
+                const relPath = `attachments/${safeName}`;
+                const sizeKB = Math.round(buffer.length / 1024);
+                content = `[PDF: ${relPath} (${sizeKB}KB)]\nUse \`pdf-reader extract ${relPath}\` to read contents.`;
+                logger.info({ chatJid, filename: safeName, size: buffer.length }, 'Downloaded PDF attachment');
+              }
+            } catch (err) {
+              logger.error({ err }, 'Failed to download PDF attachment');
+            }
+          }
+
+          // Download and process image attachments for vision
+          if (isImageMessage(msg)) {
+            try {
+              const buffer = (await downloadMediaMessage(
+                msg,
+                'buffer',
+                {},
+                { logger: console as any, reuploadRequest: this.sock.updateMediaMessage },
+              )) as Buffer;
+
+              const caption = msg.message?.imageMessage?.caption || '';
+              const group = groups[chatJid];
+              const groupDir = path.join(GROUPS_DIR, group.folder);
+              const result = await processImage(buffer, groupDir, caption);
+
+              if (result) {
+                content = result.content;
+                logger.info({ chatJid, path: result.relativePath }, 'Processed image attachment');
+              } else {
+                content = caption || '[Image - processing failed]';
+              }
+            } catch (err) {
+              logger.error({ err }, 'Failed to download image attachment');
+              content = '[Image - download failed]';
+            }
+          }
+
+          // Skip protocol messages with no text content (encryption keys, read receipts, etc.)
+          if (!content) continue;
 
           const sender = msg.key.participant || msg.key.remoteJid || '';
           const senderName = msg.pushName || sender.split('@')[0];

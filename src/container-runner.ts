@@ -35,6 +35,7 @@ export interface ContainerInput {
   isScheduledTask?: boolean;
   assistantName?: string;
   secrets?: Record<string, string>;
+  imageAttachments?: Array<{ relativePath: string; mediaType: string }>;
 }
 
 export interface ContainerOutput {
@@ -122,10 +123,16 @@ function buildVolumeMounts(
     }, null, 2) + '\n');
   }
 
-  // Sync skills from container/skills/ into each group's .claude/skills/
-  const skillsSrc = path.join(process.cwd(), 'container', 'skills');
+  // Sync skills from container/skills/ (global) and groups/{folder}/.claude/skills/
+  // (per-group) into the session's .claude/skills/ so they're available inside the
+  // container at /home/node/.claude/skills/. Per-group skills override global ones.
   const skillsDst = path.join(groupSessionsDir, 'skills');
-  if (fs.existsSync(skillsSrc)) {
+  const skillSources = [
+    path.join(process.cwd(), 'container', 'skills'),
+    path.join(groupDir, '.claude', 'skills'),
+  ];
+  for (const skillsSrc of skillSources) {
+    if (!fs.existsSync(skillsSrc)) continue;
     for (const skillDir of fs.readdirSync(skillsSrc)) {
       const srcDir = path.join(skillsSrc, skillDir);
       if (!fs.statSync(srcDir).isDirectory()) continue;
