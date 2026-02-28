@@ -44,22 +44,23 @@ When people contribute, they shouldn't add "Telegram support alongside WhatsApp.
 
 ## RFS (Request for Skills)
 
-Skills we'd love contributors to build:
+Skills we'd love contributors to build. See also the upstream README for the latest list.
 
-### Communication Channels
-Skills to add or switch to different messaging platforms:
-- `/add-telegram` - Add Telegram as an input channel
-- `/add-slack` - Add Slack as an input channel
-- `/add-discord` - Add Discord as an input channel
+### Already Available (upstream)
+These skills already exist and can be applied to a fresh fork:
+- `/add-telegram` - Telegram channel
+- `/add-discord` - Discord channel
+- `/add-slack` - Slack channel
+- `/add-gmail` - Gmail integration
+- `/convert-to-apple-container` - Apple Container runtime (macOS)
+- `/add-voice-transcription` - Voice message transcription
+- `/x-integration` - X/Twitter integration
+
+### Still Wanted
 - `/add-sms` - Add SMS via Twilio or similar
 - `/convert-to-telegram` - Replace WhatsApp with Telegram entirely
-
-### Container Runtime
-The project uses Docker by default (cross-platform). For macOS users who prefer Apple Container:
-- `/convert-to-apple-container` - Switch from Docker to Apple Container (macOS-only)
-
-### Platform Support
-- `/setup-linux` - Make the full setup work on Linux (depends on Docker conversion)
+- `/clear` - Compact/summarize conversation session programmatically
+- `/setup-linux` - Make the full setup work on Linux
 - `/setup-windows` - Windows support via WSL2 + Docker
 
 ---

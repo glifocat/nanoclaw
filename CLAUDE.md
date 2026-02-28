@@ -31,7 +31,7 @@ Single Node.js process that connects to WhatsApp, routes messages to Claude Agen
 | `/setup` | First-time installation, authentication, service configuration |
 | `/customize` | Adding channels, integrations, changing behavior |
 | `/debug` | Container issues, logs, troubleshooting |
-| `/update` | Pull upstream NanoClaw changes, merge with customizations, run migrations |
+| `/update` | **Do not use on this fork** — overwrites local customizations. Use `git fetch origin && git merge origin/main` instead |
 | `/qodo-pr-resolver` | Fetch and fix Qodo PR review issues interactively or in batch |
 | `/get-qodo-rules` | Load org- and repo-level coding rules from Qodo before code tasks |
 

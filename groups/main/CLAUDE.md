@@ -119,25 +119,22 @@ sqlite3 /workspace/project/store/messages.db "
 
 ### Registered Groups Config
 
-Groups are registered in `/workspace/project/data/registered_groups.json`:
+Groups are registered in the **SQLite database** (`registered_groups` table):
 
-```json
-{
-  "1234567890-1234567890@g.us": {
-    "name": "Family Chat",
-    "folder": "family-chat",
-    "trigger": "@Gambi",
-    "added_at": "2024-01-31T12:00:00.000Z"
-  }
-}
+```bash
+sqlite3 /workspace/project/store/messages.db "
+  SELECT jid, name, folder, trigger_pattern, requires_trigger, container_config
+  FROM registered_groups;
+"
 ```
 
 Fields:
-- **Key**: The WhatsApp JID (unique identifier for the chat)
+- **jid**: The WhatsApp JID (unique identifier for the chat)
 - **name**: Display name for the group
 - **folder**: Folder name under `groups/` for this group's files and memory
-- **trigger**: The trigger word (usually same as global, but could differ)
-- **requiresTrigger**: Whether `@trigger` prefix is needed (default: `true`). Set to `false` for solo/personal chats where all messages should be processed
+- **trigger_pattern**: The trigger word (usually same as global, but could differ)
+- **requires_trigger**: Whether `@trigger` prefix is needed (1 = yes, 0 = no). Set to 0 for solo/personal chats where all messages should be processed
+- **container_config**: JSON string with additional mount config (nullable)
 - **added_at**: ISO timestamp when registered
 
 ### Trigger Behavior
@@ -148,54 +145,65 @@ Fields:
 
 ### Adding a Group
 
-1. Query the database to find the group's JID
-2. Read `/workspace/project/data/registered_groups.json`
-3. Add the new group entry with `containerConfig` if needed
-4. Write the updated JSON back
-5. Create the group folder: `/workspace/project/groups/{folder-name}/`
-6. Optionally create an initial `CLAUDE.md` for the group
+1. Find the group's JID from `available_groups.json` or the `chats` table
+2. Send an IPC command to register the group:
+
+```bash
+echo '{"type": "register_group", "jid": "120363336345536173@g.us", "name": "Family Chat", "folder": "family-chat", "trigger": "@Gambi"}' > /workspace/ipc/tasks/register_$(date +%s).json
+```
+
+3. Create the group folder and initial memory:
+
+```bash
+mkdir -p /workspace/project/groups/family-chat
+echo "# Family Chat" > /workspace/project/groups/family-chat/CLAUDE.md
+```
 
 Example folder name conventions:
 - "Family Chat" → `family-chat`
 - "Work Team" → `work-team`
 - Use lowercase, hyphens instead of spaces
 
+To set `requiresTrigger: false` (for 1-on-1 chats), add the field to the IPC command:
+
+```bash
+echo '{"type": "register_group", "jid": "...", "name": "...", "folder": "...", "trigger": "@Gambi", "requiresTrigger": false}' > /workspace/ipc/tasks/register_$(date +%s).json
+```
+
 #### Adding Additional Directories for a Group
 
-Groups can have extra directories mounted. Add `containerConfig` to their entry:
+Groups can have extra directories mounted. Update the group's `container_config` in SQLite:
 
-```json
-{
-  "1234567890@g.us": {
-    "name": "Dev Team",
-    "folder": "dev-team",
-    "trigger": "@Gambi",
-    "added_at": "2026-01-31T12:00:00Z",
-    "containerConfig": {
-      "additionalMounts": [
-        {
-          "hostPath": "~/projects/webapp",
-          "containerPath": "webapp",
-          "readonly": false
-        }
-      ]
-    }
-  }
-}
+```bash
+sqlite3 /workspace/project/store/messages.db "
+  UPDATE registered_groups
+  SET container_config = json('{\"additionalMounts\": [{\"hostPath\": \"~/projects/webapp\", \"containerPath\": \"webapp\", \"readonly\": false}]}')
+  WHERE jid = '1234567890@g.us';
+"
 ```
 
 The directory will appear at `/workspace/extra/webapp` in that group's container.
 
+**Note:** The host path must also be in `~/.config/nanoclaw/mount-allowlist.json` on the host, and the service must be restarted for mount changes to take effect.
+
 ### Removing a Group
 
-1. Read `/workspace/project/data/registered_groups.json`
-2. Remove the entry for that group
-3. Write the updated JSON back
-4. The group folder and its files remain (don't delete them)
+```bash
+sqlite3 /workspace/project/store/messages.db "
+  DELETE FROM registered_groups WHERE jid = '1234567890@g.us';
+"
+```
+
+The group folder and its files remain on disk (don't delete them).
 
 ### Listing Groups
 
-Read `/workspace/project/data/registered_groups.json` and format it nicely.
+```bash
+sqlite3 -header -column /workspace/project/store/messages.db "
+  SELECT jid, name, folder, trigger_pattern, requires_trigger
+  FROM registered_groups;
+"
+```
 
 ---
 
@@ -216,7 +224,7 @@ This context is stored in the "casa" group to keep it private and separate from 
 
 ## Scheduling for Other Groups
 
-When scheduling tasks for other groups, use the `target_group_jid` parameter with the group's JID from `registered_groups.json`:
+When scheduling tasks for other groups, use the `target_group_jid` parameter with the group's JID from the `registered_groups` table:
 - `schedule_task(prompt: "...", schedule_type: "cron", schedule_value: "0 9 * * 1", target_group_jid: "120363336345536173@g.us")`
 
 The task will run in that group's context with access to their files and memory.
