@@ -40,7 +40,7 @@ async function transcribeWithWhisperCpp(
       '-m', WHISPER_MODEL,
       '-f', tmpWav,
       '--no-timestamps',
-      '-nt',
+      '-l', 'auto',
     ], { timeout: 60_000 });
 
     const transcript = stdout.trim();

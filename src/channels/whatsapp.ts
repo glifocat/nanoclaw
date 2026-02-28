@@ -8,6 +8,7 @@ import makeWASocket, {
   WASocket,
   fetchLatestWaWebVersion,
   makeCacheableSignalKeyStore,
+  normalizeMessageContent,
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
@@ -19,8 +20,8 @@ import {
   updateChatName,
 } from '../db.js';
 import { logger } from '../logger.js';
-import { isImageMessage, processImage } from '../image.js';
-import { isVoiceMessage, transcribeAudioMessage } from '../transcription.js';
+import { processImage } from '../image.js';
+import { transcribeAudioMessage } from '../transcription.js';
 import { Channel, OnInboundMessage, OnChatMetadata, RegisteredGroup } from '../types.js';
 
 const GROUP_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -163,6 +164,10 @@ export class WhatsAppChannel implements Channel {
       for (const msg of messages) {
         try {
         if (!msg.message) continue;
+        // Unwrap container types (viewOnce, ephemeral, edited, etc.) so that
+        // audioMessage, imageMessage, etc. are accessible at the top level.
+        const normalized = normalizeMessageContent(msg.message);
+        if (!normalized) continue;
         const rawJid = msg.key.remoteJid;
         if (!rawJid || rawJid === 'status@broadcast') continue;
 
@@ -183,14 +188,14 @@ export class WhatsAppChannel implements Channel {
         const groups = this.opts.registeredGroups();
         if (groups[chatJid]) {
           let content =
-            msg.message?.conversation ||
-            msg.message?.extendedTextMessage?.text ||
-            msg.message?.imageMessage?.caption ||
-            msg.message?.videoMessage?.caption ||
+            normalized.conversation ||
+            normalized.extendedTextMessage?.text ||
+            normalized.imageMessage?.caption ||
+            normalized.videoMessage?.caption ||
             '';
 
           // Download PDF attachments to group workspace
-          const docMsg = msg.message?.documentMessage;
+          const docMsg = normalized.documentMessage;
           if (docMsg?.mimetype === 'application/pdf') {
             try {
               const buffer = (await downloadMediaMessage(
@@ -220,7 +225,7 @@ export class WhatsAppChannel implements Channel {
           }
 
           // Download and process image attachments for vision
-          if (isImageMessage(msg)) {
+          if (normalized.imageMessage) {
             try {
               const buffer = (await downloadMediaMessage(
                 msg,
@@ -229,7 +234,7 @@ export class WhatsAppChannel implements Channel {
                 { logger: console as any, reuploadRequest: this.sock.updateMediaMessage },
               )) as Buffer;
 
-              const caption = msg.message?.imageMessage?.caption || '';
+              const caption = normalized.imageMessage?.caption || '';
               const group = groups[chatJid];
               const groupDir = path.join(GROUPS_DIR, group.folder);
               const result = await processImage(buffer, groupDir, caption);
@@ -247,7 +252,7 @@ export class WhatsAppChannel implements Channel {
           }
 
           // Transcribe voice messages (before !content guard — voice has no text fields)
-          if (isVoiceMessage(msg)) {
+          if (normalized.audioMessage?.ptt === true) {
             try {
               const transcript = await transcribeAudioMessage(msg, this.sock);
               if (transcript) {

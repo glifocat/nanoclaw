@@ -103,6 +103,7 @@ vi.mock('@whiskeysockets/baileys', () => {
       restartRequired: 515,
     },
     fetchLatestWaWebVersion: vi.fn().mockResolvedValue({ version: [2, 3000, 0] }),
+    normalizeMessageContent: vi.fn((content: unknown) => content),
     makeCacheableSignalKeyStore: vi.fn((keys: unknown) => keys),
     useMultiFileAuthState: vi.fn().mockResolvedValue({
       state: {
@@ -485,6 +486,8 @@ describe('WhatsAppChannel', () => {
     });
 
     it('extracts caption from imageMessage', async () => {
+      const mockBuffer = Buffer.from('fake-image-data');
+      vi.mocked(downloadMediaMessage).mockResolvedValueOnce(mockBuffer as any);
       const opts = createTestOpts();
       const channel = new WhatsAppChannel(opts);
 
@@ -506,9 +509,10 @@ describe('WhatsAppChannel', () => {
         },
       ]);
 
+      // Image messages go through vision pipeline; processImage returns content with path + caption
       expect(opts.onMessage).toHaveBeenCalledWith(
         'registered@g.us',
-        expect.objectContaining({ content: 'Check this photo' }),
+        expect.objectContaining({ content: '[Image: attachments/img-123.jpg] Check this photo' }),
       );
     });
 
