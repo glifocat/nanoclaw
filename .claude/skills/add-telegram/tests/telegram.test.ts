@@ -11,7 +11,7 @@ describe('telegram skill package', () => {
 
     const content = fs.readFileSync(manifestPath, 'utf-8');
     expect(content).toContain('skill: telegram');
-    expect(content).toContain('version: 1.0.0');
+    expect(content).toContain('version: 1.1.0');
     expect(content).toContain('grammy');
   });
 

@@ -1,50 +1,54 @@
 # Intent: src/index.ts modifications
 
 ## What changed
-Refactored from single WhatsApp channel to multi-channel architecture using the `Channel` interface.
+Refactored from single WhatsApp channel to multi-channel architecture using the `Channel` interface. Added Telegram as an optional second channel. Also includes datePrefix injection, image attachment threading, and container-runtime abstraction.
 
 ## Key sections
 
 ### Imports (top of file)
 - Added: `TelegramChannel` from `./channels/telegram.js`
 - Added: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ONLY` from `./config.js`
-- Added: `findChannel` from `./router.js`
-- Added: `Channel` type from `./types.js`
+- Added: `TIMEZONE` from `./config.js`
+- Added: `parseImageReferences` from `./image.js`
+- Added: `resolveGroupFolderPath` from `./group-folder.js`
+- Added: `cleanupOrphans`, `ensureContainerRuntimeRunning` from `./container-runtime.js`
+- Already present: `findChannel` from `./router.js`, `Channel` type from `./types.js`, `channels: Channel[]` array
 
-### Module-level state
-- Added: `const channels: Channel[] = []` — array of all active channels
-- Kept: `let whatsapp: WhatsAppChannel` — still needed for `syncGroupMetadata` reference
+### datePrefix()
+- New function using es-ES locale with weekday for agent date awareness
+- Prepended to all prompts in processGroupMessages and startMessageLoop
 
 ### processGroupMessages()
-- Added: `findChannel(channels, chatJid)` lookup at the start
-- Changed: `whatsapp.setTyping()` → `channel.setTyping?.()` (optional chaining)
-- Changed: `whatsapp.sendMessage()` → `channel.sendMessage()` in output callback
+- Uses `findChannel(channels, chatJid)` lookup (multi-channel)
+- Uses `channel.setTyping?.()` (optional chaining for channels without typing)
+- Uses `channel.sendMessage()` for output delivery
+- Prepends `datePrefix()` to formatted messages
+- Extracts `parseImageReferences()` and threads to `runAgent`
 
-### getAvailableGroups()
-- Unchanged: uses `c.is_group` filter from base (Telegram channels pass `isGroup=true` via `onChatMetadata`)
+### runAgent()
+- Added `imageAttachments` parameter
+- Passes `assistantName: ASSISTANT_NAME` to container input
+- Conditionally spreads `imageAttachments` into container input
 
 ### startMessageLoop()
-- Added: `findChannel(channels, chatJid)` lookup per group in message processing
-- Changed: `whatsapp.setTyping()` → `channel.setTyping?.()` for typing indicators
+- Uses `findChannel(channels, chatJid)` per group
+- Uses `channel.setTyping?.()` with `.catch()` for typing indicators
+- Prepends `datePrefix()` to formatted messages
 
 ### main()
-- Changed: shutdown disconnects all channels via `for (const ch of channels)`
-- Added: shared `channelOpts` object for channel callbacks
-- Added: conditional WhatsApp creation (`if (!TELEGRAM_ONLY)`)
-- Added: conditional Telegram creation (`if (TELEGRAM_BOT_TOKEN)`)
-- Changed: scheduler `sendMessage` uses `findChannel()` → `channel.sendMessage()`
-- Changed: IPC `sendMessage` uses `findChannel()` → `channel.sendMessage()`
+- Uses `ensureContainerRuntimeRunning()` + `cleanupOrphans()` (abstracted)
+- Shutdown disconnects all channels via `for (const ch of channels)`
+- Shared `channelOpts` object for channel callbacks
+- Conditional WhatsApp creation (`if (!TELEGRAM_ONLY)`)
+- Conditional Telegram creation (`if (TELEGRAM_BOT_TOKEN)`)
+- Scheduler and IPC use `findChannel()` for multi-channel routing
+- `startMessageLoop().catch()` for crash handling
 
 ## Invariants
-- All existing message processing logic (triggers, cursors, idle timers) is preserved
-- The `runAgent` function is completely unchanged
-- State management (loadState/saveState) is unchanged
-- Recovery logic is unchanged
-- Container runtime check is unchanged (ensureContainerSystemRunning)
-
-## Must-keep
-- The `escapeXml` and `formatMessages` re-exports
-- The `_setRegisteredGroups` test helper
-- The `isDirectRun` guard at bottom
-- All error handling and cursor rollback logic in processGroupMessages
-- The outgoing queue flush and reconnection logic (in WhatsAppChannel, not here)
+- All existing message processing logic (triggers, cursors, idle timers) preserved
+- State management (loadState/saveState) unchanged
+- Recovery logic unchanged
+- `escapeXml` and `formatMessages` re-exports preserved
+- `_setRegisteredGroups` test helper preserved
+- `isDirectRun` guard preserved
+- Error rollback with duplicate prevention preserved

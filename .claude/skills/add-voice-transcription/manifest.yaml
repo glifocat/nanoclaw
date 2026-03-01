@@ -1,7 +1,7 @@
 skill: voice-transcription
-version: 1.0.0
+version: 1.1.0
 description: "Voice message transcription via OpenAI Whisper"
-core_version: 0.1.0
+core_version: 1.1.2
 adds:
   - src/transcription.ts
 modifies:

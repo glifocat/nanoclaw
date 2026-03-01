@@ -15,7 +15,7 @@ describe('add-image-vision skill package', () => {
     it('has a valid manifest.yaml', () => {
       expect(fs.existsSync(path.join(SKILL_DIR, 'manifest.yaml'))).toBe(true);
       expect(content).toContain('skill: add-image-vision');
-      expect(content).toContain('version: 1.0.0');
+      expect(content).toContain('version: 1.1.0');
     });
 
     it('declares sharp as npm dependency', () => {
@@ -115,7 +115,8 @@ describe('add-image-vision skill package', () => {
     });
 
     it('imports image utilities', () => {
-      expect(content).toContain("import { isImageMessage, processImage } from '../image.js'");
+      expect(content).toContain("from '../image.js'");
+      expect(content).toContain('processImage');
     });
 
     it('imports downloadMediaMessage', () => {
@@ -131,7 +132,6 @@ describe('add-image-vision skill package', () => {
     });
 
     it('includes image processing block', () => {
-      expect(content).toContain('isImageMessage(msg)');
       expect(content).toContain('processImage(buffer, groupDir, caption)');
       expect(content).toContain('[Image - download failed]');
       expect(content).toContain('[Image - processing failed]');
@@ -144,23 +144,6 @@ describe('add-image-vision skill package', () => {
       expect(content).toContain('async syncGroupMetadata(');
       expect(content).toContain('private async translateJid(');
       expect(content).toContain('private async flushOutgoingQueue(');
-    });
-
-    it('does NOT include voice transcription', () => {
-      expect(content).not.toContain('isVoiceMessage');
-      expect(content).not.toContain('transcribeAudioMessage');
-      expect(content).not.toContain('transcription');
-    });
-
-    it('does NOT include PDF reader', () => {
-      expect(content).not.toContain('documentMessage');
-      expect(content).not.toContain('application/pdf');
-    });
-
-    it('does NOT include reconnection improvements', () => {
-      expect(content).not.toContain('scheduleReconnect');
-      expect(content).not.toContain('reconnectAttempts');
-      expect(content).not.toContain('fetchLatestWaWebVersion');
     });
   });
 
@@ -204,14 +187,10 @@ describe('add-image-vision skill package', () => {
       expect(content).toContain('channel properties');
     });
 
-    it('does NOT include voice transcription tests', () => {
-      expect(content).not.toContain('transcribes voice messages');
-      expect(content).not.toContain('transcribeAudioMessage');
-    });
-
-    it('does NOT include PDF tests', () => {
-      expect(content).not.toContain('downloads and injects PDF');
-      expect(content).not.toContain('PDF download failure');
+    it('includes all media handling test sections', () => {
+      // Image tests present (core skill feature)
+      expect(content).toContain('downloads and processes image attachments');
+      expect(content).toContain('handles image without caption');
     });
   });
 
@@ -226,12 +205,13 @@ describe('add-image-vision skill package', () => {
       expect(content).toContain('mediaType: string');
     });
 
-    it('does NOT include assistantName', () => {
+    it('preserves core container-runner structure', () => {
       const content = fs.readFileSync(
         path.join(SKILL_DIR, 'modify', 'src', 'container-runner.ts'),
         'utf-8',
       );
-      expect(content).not.toContain('assistantName');
+      expect(content).toContain('export async function runContainerAgent');
+      expect(content).toContain('ContainerInput');
     });
   });
 
@@ -262,12 +242,10 @@ describe('add-image-vision skill package', () => {
       expect(content).toContain('...(imageAttachments.length > 0 && { imageAttachments })');
     });
 
-    it('does NOT include resolveGroupFolderPath', () => {
-      expect(content).not.toContain('resolveGroupFolderPath');
-    });
-
-    it('does NOT include assistantName in container input', () => {
-      expect(content).not.toContain('assistantName');
+    it('preserves core index.ts structure', () => {
+      expect(content).toContain('processGroupMessages');
+      expect(content).toContain('startMessageLoop');
+      expect(content).toContain('async function main()');
     });
   });
 
@@ -311,14 +289,9 @@ describe('add-image-vision skill package', () => {
       expect(content).toContain('async function main');
     });
 
-    it('does NOT include assistantName', () => {
-      expect(content).not.toContain('assistantName');
-    });
-
-    it('does NOT include Google/Vanta MCP', () => {
-      expect(content).not.toContain('mcp__vanta__');
-      expect(content).not.toContain('mcp__google-workspace__');
-      expect(content).not.toContain('GOOGLE_OAUTH');
+    it('preserves core agent-runner exports', () => {
+      expect(content).toContain('async function main');
+      expect(content).toContain('function writeOutput');
     });
   });
 });

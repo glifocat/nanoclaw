@@ -4,7 +4,6 @@
  */
 import { ChildProcess, exec, spawn } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 
 import {
@@ -14,8 +13,10 @@ import {
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
+  TIMEZONE,
 } from './config.js';
 import { readEnvFile } from './env.js';
+import { resolveGroupFolderPath, resolveGroupIpcPath } from './group-folder.js';
 import { logger } from './logger.js';
 import { CONTAINER_RUNTIME_BIN, readonlyMountArgs, stopContainer } from './container-runtime.js';
 import { validateAdditionalMounts } from './mount-security.js';
@@ -25,16 +26,6 @@ import { RegisteredGroup } from './types.js';
 const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
 const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
 
-function getHomeDir(): string {
-  const home = process.env.HOME || os.homedir();
-  if (!home) {
-    throw new Error(
-      'Unable to determine home directory: HOME environment variable is not set and os.homedir() returned empty',
-    );
-  }
-  return home;
-}
-
 export interface ContainerInput {
   prompt: string;
   sessionId?: string;
@@ -42,6 +33,7 @@ export interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
+  assistantName?: string;
   secrets?: Record<string, string>;
   imageAttachments?: Array<{ relativePath: string; mediaType: string }>;
 }
@@ -64,27 +56,31 @@ function buildVolumeMounts(
   isMain: boolean,
 ): VolumeMount[] {
   const mounts: VolumeMount[] = [];
-  const homeDir = getHomeDir();
   const projectRoot = process.cwd();
+  const groupDir = resolveGroupFolderPath(group.folder);
 
   if (isMain) {
-    // Main gets the entire project root mounted
+    // Main gets the project root read-only. Writable paths the agent needs
+    // (group folder, IPC, .claude/) are mounted separately below.
+    // Read-only prevents the agent from modifying host application code
+    // (src/, dist/, package.json, etc.) which would bypass the sandbox
+    // entirely on next restart.
     mounts.push({
       hostPath: projectRoot,
       containerPath: '/workspace/project',
-      readonly: false,
+      readonly: true,
     });
 
     // Main also gets its group folder as the working directory
     mounts.push({
-      hostPath: path.join(GROUPS_DIR, group.folder),
+      hostPath: groupDir,
       containerPath: '/workspace/group',
       readonly: false,
     });
   } else {
     // Other groups only get their own folder
     mounts.push({
-      hostPath: path.join(GROUPS_DIR, group.folder),
+      hostPath: groupDir,
       containerPath: '/workspace/group',
       readonly: false,
     });
@@ -127,10 +123,16 @@ function buildVolumeMounts(
     }, null, 2) + '\n');
   }
 
-  // Sync skills from container/skills/ into each group's .claude/skills/
-  const skillsSrc = path.join(process.cwd(), 'container', 'skills');
+  // Sync skills from container/skills/ (global) and groups/{folder}/.claude/skills/
+  // (per-group) into the session's .claude/skills/ so they're available inside the
+  // container at /home/node/.claude/skills/. Per-group skills override global ones.
   const skillsDst = path.join(groupSessionsDir, 'skills');
-  if (fs.existsSync(skillsSrc)) {
+  const skillSources = [
+    path.join(process.cwd(), 'container', 'skills'),
+    path.join(groupDir, '.claude', 'skills'),
+  ];
+  for (const skillsSrc of skillSources) {
+    if (!fs.existsSync(skillsSrc)) continue;
     for (const skillDir of fs.readdirSync(skillsSrc)) {
       const srcDir = path.join(skillsSrc, skillDir);
       if (!fs.statSync(srcDir).isDirectory()) continue;
@@ -146,7 +148,7 @@ function buildVolumeMounts(
 
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC
-  const groupIpcDir = path.join(DATA_DIR, 'ipc', group.folder);
+  const groupIpcDir = resolveGroupIpcPath(group.folder);
   fs.mkdirSync(path.join(groupIpcDir, 'messages'), { recursive: true });
   fs.mkdirSync(path.join(groupIpcDir, 'tasks'), { recursive: true });
   fs.mkdirSync(path.join(groupIpcDir, 'input'), { recursive: true });
@@ -156,13 +158,18 @@ function buildVolumeMounts(
     readonly: false,
   });
 
-  // Mount agent-runner source from host — recompiled on container startup.
-  // Bypasses sticky build cache for code changes.
+  // Copy agent-runner source into a per-group writable location so agents
+  // can customize it (add tools, change behavior) without affecting other
+  // groups. Recompiled on container startup via entrypoint.sh.
   const agentRunnerSrc = path.join(projectRoot, 'container', 'agent-runner', 'src');
+  const groupAgentRunnerDir = path.join(DATA_DIR, 'sessions', group.folder, 'agent-runner-src');
+  if (!fs.existsSync(groupAgentRunnerDir) && fs.existsSync(agentRunnerSrc)) {
+    fs.cpSync(agentRunnerSrc, groupAgentRunnerDir, { recursive: true });
+  }
   mounts.push({
-    hostPath: agentRunnerSrc,
+    hostPath: groupAgentRunnerDir,
     containerPath: '/app/src',
-    readonly: true,
+    readonly: false,
   });
 
   // Additional mounts validated against external allowlist (tamper-proof from containers)
@@ -183,11 +190,20 @@ function buildVolumeMounts(
  * Secrets are never written to disk or mounted as files.
  */
 function readSecrets(): Record<string, string> {
-  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
+  return readEnvFile([
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'ANTHROPIC_API_KEY',
+    'GOOGLE_OAUTH_CLIENT_ID',
+    'GOOGLE_OAUTH_CLIENT_SECRET',
+    'PASSION_GOOGLE_EMAIL',
+  ]);
 }
 
 function buildContainerArgs(mounts: VolumeMount[], containerName: string): string[] {
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+
+  // Pass host timezone so container's local time matches the user's
+  args.push('-e', `TZ=${TIMEZONE}`);
 
   // Run as host user so bind-mounted files are accessible.
   // Skip when running as root (uid 0), as the container's node user (uid 1000),
@@ -220,7 +236,7 @@ export async function runContainerAgent(
 ): Promise<ContainerOutput> {
   const startTime = Date.now();
 
-  const groupDir = path.join(GROUPS_DIR, group.folder);
+  const groupDir = resolveGroupFolderPath(group.folder);
   fs.mkdirSync(groupDir, { recursive: true });
 
   const mounts = buildVolumeMounts(group, input.isMain);
@@ -251,7 +267,7 @@ export async function runContainerAgent(
     'Spawning container agent',
   );
 
-  const logsDir = path.join(GROUPS_DIR, group.folder, 'logs');
+  const logsDir = path.join(groupDir, 'logs');
   fs.mkdirSync(logsDir, { recursive: true });
 
   return new Promise((resolve) => {
@@ -595,7 +611,7 @@ export function writeTasksSnapshot(
   }>,
 ): void {
   // Write filtered tasks to the group's IPC directory
-  const groupIpcDir = path.join(DATA_DIR, 'ipc', groupFolder);
+  const groupIpcDir = resolveGroupIpcPath(groupFolder);
   fs.mkdirSync(groupIpcDir, { recursive: true });
 
   // Main sees all tasks, others only see their own
@@ -625,7 +641,7 @@ export function writeGroupsSnapshot(
   groups: AvailableGroup[],
   registeredJids: Set<string>,
 ): void {
-  const groupIpcDir = path.join(DATA_DIR, 'ipc', groupFolder);
+  const groupIpcDir = resolveGroupIpcPath(groupFolder);
   fs.mkdirSync(groupIpcDir, { recursive: true });
 
   // Main sees all groups; others see nothing (they can't activate groups)

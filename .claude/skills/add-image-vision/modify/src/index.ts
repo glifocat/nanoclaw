@@ -3,10 +3,10 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
-  DATA_DIR,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
+  TIMEZONE,
   TRIGGER_PATTERN,
 } from './config.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
@@ -16,7 +16,6 @@ import {
   writeGroupsSnapshot,
   writeTasksSnapshot,
 } from './container-runner.js';
-import { parseImageReferences } from './image.js';
 import { cleanupOrphans, ensureContainerRuntimeRunning } from './container-runtime.js';
 import {
   getAllChats,
@@ -34,6 +33,8 @@ import {
   storeMessage,
 } from './db.js';
 import { GroupQueue } from './group-queue.js';
+import { parseImageReferences } from './image.js';
+import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import { startSchedulerLoop } from './task-scheduler.js';
@@ -48,6 +49,24 @@ let sessions: Record<string, string> = {};
 let registeredGroups: Record<string, RegisteredGroup> = {};
 let lastAgentTimestamp: Record<string, string> = {};
 let messageLoopRunning = false;
+
+/** Prefix with current local date/time so the agent knows the day of week. */
+function datePrefix(): string {
+  const now = new Date();
+  const localDate = now.toLocaleDateString('es-ES', {
+    timeZone: TIMEZONE,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const localTime = now.toLocaleTimeString('es-ES', {
+    timeZone: TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `[Current date and time: ${localDate}, ${localTime}]\n\n`;
+}
 
 let whatsapp: WhatsAppChannel;
 const channels: Channel[] = [];
@@ -79,11 +98,21 @@ function saveState(): void {
 }
 
 function registerGroup(jid: string, group: RegisteredGroup): void {
+  let groupDir: string;
+  try {
+    groupDir = resolveGroupFolderPath(group.folder);
+  } catch (err) {
+    logger.warn(
+      { jid, folder: group.folder, err },
+      'Rejecting group registration with invalid folder',
+    );
+    return;
+  }
+
   registeredGroups[jid] = group;
   setRegisteredGroup(jid, group);
 
   // Create group folder
-  const groupDir = path.join(DATA_DIR, '..', 'groups', group.folder);
   fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
 
   logger.info(
@@ -144,7 +173,7 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     if (!hasTrigger) return true;
   }
 
-  const prompt = formatMessages(missedMessages);
+  const prompt = datePrefix() + formatMessages(missedMessages);
   const imageAttachments = parseImageReferences(missedMessages);
 
   // Advance cursor so the piping path in startMessageLoop won't re-fetch
@@ -273,6 +302,7 @@ async function runAgent(
         groupFolder: group.folder,
         chatJid,
         isMain,
+        assistantName: ASSISTANT_NAME,
         ...(imageAttachments.length > 0 && { imageAttachments }),
       },
       (proc, containerName) => queue.registerProcess(chatJid, proc, containerName, group.folder),
@@ -363,7 +393,7 @@ async function startMessageLoop(): Promise<void> {
           );
           const messagesToSend =
             allPending.length > 0 ? allPending : groupMessages;
-          const formatted = formatMessages(messagesToSend);
+          const formatted = datePrefix() + formatMessages(messagesToSend);
 
           if (queue.sendMessage(chatJid, formatted)) {
             logger.debug(

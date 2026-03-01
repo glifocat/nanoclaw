@@ -11,7 +11,7 @@ describe('voice-transcription skill package', () => {
 
     const content = fs.readFileSync(manifestPath, 'utf-8');
     expect(content).toContain('skill: voice-transcription');
-    expect(content).toContain('version: 1.0.0');
+    expect(content).toContain('version: 1.1.0');
     expect(content).toContain('openai');
     expect(content).toContain('OPENAI_API_KEY');
   });
@@ -73,12 +73,11 @@ describe('voice-transcription skill package', () => {
     );
 
     // Transcription imports
-    expect(content).toContain("import { isVoiceMessage, transcribeAudioMessage } from '../transcription.js'");
+    expect(content).toContain("from '../transcription.js'");
+    expect(content).toContain('transcribeAudioMessage');
 
     // Voice message handling
-    expect(content).toContain('isVoiceMessage(msg)');
     expect(content).toContain('transcribeAudioMessage(msg, this.sock)');
-    expect(content).toContain('finalContent');
     expect(content).toContain('[Voice:');
     expect(content).toContain('[Voice Message - transcription unavailable]');
     expect(content).toContain('[Voice Message - transcription failed]');
