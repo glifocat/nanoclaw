@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { closeAll } from './auth.js';
 
-const VALID_MODULES = ['reminders', 'calendar', 'contacts', 'mail', 'notes'] as const;
+const VALID_MODULES = ['calendar', 'contacts', 'mail', 'notes'] as const;
 type ModuleName = (typeof VALID_MODULES)[number];
 
 export function parseModules(): ModuleName[] {
@@ -17,10 +17,6 @@ export function parseModules(): ModuleName[] {
 }
 
 const MODULE_LOADERS: Record<ModuleName, (server: McpServer) => Promise<void>> = {
-  reminders: async (server) => {
-    const { registerReminders } = await import('./modules/reminders.js');
-    registerReminders(server);
-  },
   calendar: async (server) => {
     const { registerCalendar } = await import('./modules/calendar.js');
     registerCalendar(server);

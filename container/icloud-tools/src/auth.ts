@@ -66,12 +66,15 @@ export async function getImapClient(): Promise<ImapFlow> {
 export function getSmtpTransport(): Transporter {
   if (!smtpTransport) {
     const creds = getCredentials();
-    smtpTransport = createTransport({
-      host: 'smtp.mail.me.com',
-      port: 587,
-      secure: false,
-      auth: { user: creds.username, pass: creds.password },
-    });
+    smtpTransport = createTransport(
+      {
+        host: 'smtp.mail.me.com',
+        port: 587,
+        secure: false,
+        auth: { user: creds.username, pass: creds.password },
+      },
+      { from: creds.username },
+    );
   }
   return smtpTransport;
 }
