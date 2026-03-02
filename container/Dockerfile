@@ -64,6 +64,12 @@ RUN cd /opt/icloud-tools && npm install --omit=dev
 COPY icloud-tools/ /opt/icloud-tools/
 RUN cd /opt/icloud-tools && npx tsc
 
+# Build apple-reminders MCP server (IPC bridge to host-side JXA)
+COPY apple-reminders-mcp/package*.json /opt/apple-reminders-mcp/
+RUN cd /opt/apple-reminders-mcp && npm install --omit=dev
+COPY apple-reminders-mcp/ /opt/apple-reminders-mcp/
+RUN cd /opt/apple-reminders-mcp && npx tsc
+
 # Create workspace directories
 RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input
 

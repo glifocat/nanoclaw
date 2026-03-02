@@ -8,9 +8,9 @@ describe('module loader', () => {
   });
 
   it('parses ICLOUD_MODULES comma-separated list', async () => {
-    process.env.ICLOUD_MODULES = 'reminders,calendar';
+    process.env.ICLOUD_MODULES = 'calendar,contacts';
     const { parseModules } = await import('../server.js');
-    expect(parseModules()).toEqual(['reminders', 'calendar']);
+    expect(parseModules()).toEqual(['calendar', 'contacts']);
   });
 
   it('returns empty array when ICLOUD_MODULES is unset', async () => {
@@ -20,13 +20,13 @@ describe('module loader', () => {
   });
 
   it('ignores whitespace and empty segments', async () => {
-    process.env.ICLOUD_MODULES = ' reminders , , calendar ';
+    process.env.ICLOUD_MODULES = ' calendar , , contacts ';
     const { parseModules } = await import('../server.js');
-    expect(parseModules()).toEqual(['reminders', 'calendar']);
+    expect(parseModules()).toEqual(['calendar', 'contacts']);
   });
 
   it('rejects unknown module names', async () => {
-    process.env.ICLOUD_MODULES = 'reminders,bogus';
+    process.env.ICLOUD_MODULES = 'calendar,bogus';
     const { parseModules } = await import('../server.js');
     expect(() => parseModules()).toThrow('Unknown module: bogus');
   });

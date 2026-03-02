@@ -13,6 +13,7 @@ import { AvailableGroup } from './container-runner.js';
 import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
 import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
+import { handleRemindersIpc } from './reminders-ipc.js';
 import { RegisteredGroup } from './types.js';
 
 export interface IpcDeps {
@@ -381,7 +382,12 @@ export async function processTaskIpc(
       }
       break;
 
-    default:
-      logger.warn({ type: data.type }, 'Unknown IPC task type');
+    default: {
+      const handled = await handleRemindersIpc(data as Record<string, unknown>, sourceGroup, isMain, DATA_DIR);
+      if (!handled) {
+        logger.warn({ type: data.type }, 'Unknown IPC task type');
+      }
+      break;
+    }
   }
 }
