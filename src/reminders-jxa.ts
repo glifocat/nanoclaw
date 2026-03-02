@@ -1,14 +1,18 @@
 /**
- * Host-side JXA layer for Apple Reminders.
+ * Host-side Apple Reminders layer using a compiled Swift EventKit CLI.
  *
- * Seven functions that shell out to `osascript -l JavaScript` to interact
- * with the macOS Reminders app. All user strings are escaped via
- * JSON.stringify() inside JXA scripts for injection safety.
+ * Replaces the previous JXA/osascript approach which was too slow for large
+ * lists (Apple Event IPC overhead: ~30s for 54 items vs ~0.6s via EventKit).
+ *
+ * The Swift binary lives at tools/reminders-cli/reminders-cli and is compiled
+ * once with `swiftc -O`. It uses EventKit directly, bypassing Apple Events.
  *
  * Every function returns a RemindersResult and never throws.
  */
 
 import { execFile } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { logger } from './logger.js';
 
@@ -22,18 +26,35 @@ export interface RemindersResult {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function runJxa(script: string): Promise<RemindersResult> {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CLI_PATH = path.resolve(__dirname, '..', 'tools', 'reminders-cli', 'reminders-cli');
+
+function runCli(args: string[]): Promise<RemindersResult> {
   return new Promise((resolve) => {
     execFile(
-      'osascript',
-      ['-l', 'JavaScript', '-e', script],
-      { timeout: 15000 },
+      CLI_PATH,
+      args,
+      { timeout: 30000 },
       (err, stdout, stderr) => {
         if (err) {
-          logger.error({ err, stderr }, 'JXA script failed');
+          // The CLI outputs JSON even on error (exit code 1)
+          const trimmed = stdout.trim();
+          if (trimmed) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              resolve({
+                success: false,
+                message: parsed.message || err.message,
+              });
+              return;
+            } catch {
+              // fall through to generic error
+            }
+          }
+          logger.error({ err, stderr }, 'reminders-cli failed');
           resolve({
             success: false,
-            message: `osascript failed: ${err.message}`,
+            message: `reminders-cli failed: ${err.message}`,
           });
           return;
         }
@@ -45,13 +66,17 @@ function runJxa(script: string): Promise<RemindersResult> {
         }
 
         try {
-          const data = JSON.parse(trimmed);
-          resolve({ success: true, message: 'OK', data });
+          const parsed = JSON.parse(trimmed);
+          resolve({
+            success: parsed.success ?? true,
+            message: parsed.message ?? 'OK',
+            data: parsed.data,
+          });
         } catch (parseErr) {
-          logger.error({ stdout: trimmed, parseErr }, 'Failed to parse JXA output');
+          logger.error({ stdout: trimmed, parseErr }, 'Failed to parse CLI output');
           resolve({
             success: false,
-            message: `Failed to parse JXA output: ${(parseErr as Error).message}`,
+            message: `Failed to parse CLI output: ${(parseErr as Error).message}`,
           });
         }
       },
@@ -67,18 +92,7 @@ function runJxa(script: string): Promise<RemindersResult> {
  * List all reminder lists with their item counts.
  */
 export function listRemindersLists(): Promise<RemindersResult> {
-  const script = `
-    const app = Application("Reminders");
-    const lists = app.lists();
-    const result = lists.map(l => ({
-      name: l.name(),
-      id: l.id(),
-      count: l.reminders.whose({completed: false})().length,
-      completedCount: l.reminders.whose({completed: true})().length,
-    }));
-    JSON.stringify(result);
-  `;
-  return runJxa(script);
+  return runCli(['list_lists']);
 }
 
 /**
@@ -88,23 +102,9 @@ export function listRemindersItems(
   listName: string,
   includeCompleted: boolean = false,
 ): Promise<RemindersResult> {
-  const safeListName = JSON.stringify(listName);
-  const script = `
-    const app = Application("Reminders");
-    const includeCompleted = ${includeCompleted};
-    const list = app.lists.byName(${safeListName});
-    const items = includeCompleted
-      ? list.reminders()
-      : list.reminders.whose({completed: false})();
-    const result = items.map(r => ({
-      name: r.name(),
-      notes: r.body() || "",
-      dueDate: r.dueDate() ? r.dueDate().toISOString() : null,
-      completed: r.completed(),
-    }));
-    JSON.stringify(result);
-  `;
-  return runJxa(script);
+  const args = ['list_items', listName];
+  if (includeCompleted) args.push('--include-completed');
+  return runCli(args);
 }
 
 /**
@@ -116,30 +116,10 @@ export function addRemindersItem(
   notes?: string,
   dueDate?: string,
 ): Promise<RemindersResult> {
-  const safeListName = JSON.stringify(listName);
-  const safeTitle = JSON.stringify(title);
-  const safeNotes = notes !== undefined ? JSON.stringify(notes) : 'null';
-  const safeDueDate = dueDate !== undefined ? JSON.stringify(dueDate) : 'null';
-
-  const script = `
-    const app = Application("Reminders");
-    const list = app.lists.byName(${safeListName});
-    const props = { name: ${safeTitle} };
-    const notes = ${safeNotes};
-    if (notes !== null) props.body = notes;
-    const dueDateStr = ${safeDueDate};
-    if (dueDateStr !== null) props.dueDate = new Date(dueDateStr);
-    const item = app.Reminder(props);
-    list.reminders.push(item);
-    const created = list.reminders.byName(${safeTitle});
-    JSON.stringify({
-      name: created.name(),
-      notes: created.body() || "",
-      dueDate: created.dueDate() ? created.dueDate().toISOString() : null,
-      completed: created.completed(),
-    });
-  `;
-  return runJxa(script);
+  const args = ['add_item', listName, title];
+  if (notes !== undefined) args.push('--notes', notes);
+  if (dueDate !== undefined) args.push('--due', dueDate);
+  return runCli(args);
 }
 
 /**
@@ -150,7 +130,6 @@ export function updateRemindersItem(
   itemTitle: string,
   updates: { newTitle?: string; newNotes?: string; newDueDate?: string },
 ): Promise<RemindersResult> {
-  // Validate before calling JXA
   if (!updates.newTitle && !updates.newNotes && !updates.newDueDate) {
     return Promise.resolve({
       success: false,
@@ -158,33 +137,11 @@ export function updateRemindersItem(
     });
   }
 
-  const safeListName = JSON.stringify(listName);
-  const safeItemTitle = JSON.stringify(itemTitle);
-  const safeNewTitle = updates.newTitle !== undefined ? JSON.stringify(updates.newTitle) : 'null';
-  const safeNewNotes = updates.newNotes !== undefined ? JSON.stringify(updates.newNotes) : 'null';
-  const safeNewDueDate =
-    updates.newDueDate !== undefined ? JSON.stringify(updates.newDueDate) : 'null';
-
-  const script = `
-    const app = Application("Reminders");
-    const list = app.lists.byName(${safeListName});
-    const items = list.reminders.whose({name: ${safeItemTitle}})();
-    if (items.length === 0) throw new Error("Reminder not found: " + ${safeItemTitle});
-    const item = items[0];
-    const newTitle = ${safeNewTitle};
-    const newNotes = ${safeNewNotes};
-    const newDueDateStr = ${safeNewDueDate};
-    if (newTitle !== null) item.name = newTitle;
-    if (newNotes !== null) item.body = newNotes;
-    if (newDueDateStr !== null) item.dueDate = new Date(newDueDateStr);
-    JSON.stringify({
-      name: item.name(),
-      notes: item.body() || "",
-      dueDate: item.dueDate() ? item.dueDate().toISOString() : null,
-      completed: item.completed(),
-    });
-  `;
-  return runJxa(script);
+  const args = ['update_item', listName, itemTitle];
+  if (updates.newTitle !== undefined) args.push('--new-title', updates.newTitle);
+  if (updates.newNotes !== undefined) args.push('--new-notes', updates.newNotes);
+  if (updates.newDueDate !== undefined) args.push('--new-due', updates.newDueDate);
+  return runCli(args);
 }
 
 /**
@@ -194,22 +151,7 @@ export function completeRemindersItem(
   listName: string,
   itemTitle: string,
 ): Promise<RemindersResult> {
-  const safeListName = JSON.stringify(listName);
-  const safeItemTitle = JSON.stringify(itemTitle);
-
-  const script = `
-    const app = Application("Reminders");
-    const list = app.lists.byName(${safeListName});
-    const items = list.reminders.whose({name: ${safeItemTitle}, completed: false})();
-    if (items.length === 0) throw new Error("Active reminder not found: " + ${safeItemTitle});
-    const item = items[0];
-    item.completed = true;
-    JSON.stringify({
-      name: item.name(),
-      completed: item.completed(),
-    });
-  `;
-  return runJxa(script);
+  return runCli(['complete_item', listName, itemTitle]);
 }
 
 /**
@@ -219,53 +161,18 @@ export function removeRemindersItem(
   listName: string,
   itemTitle: string,
 ): Promise<RemindersResult> {
-  const safeListName = JSON.stringify(listName);
-  const safeItemTitle = JSON.stringify(itemTitle);
-
-  const script = `
-    const app = Application("Reminders");
-    const list = app.lists.byName(${safeListName});
-    const items = list.reminders.whose({name: ${safeItemTitle}})();
-    if (items.length === 0) throw new Error("Reminder not found: " + ${safeItemTitle});
-    const found = items[0];
-    app.delete(found);
-    JSON.stringify({ deleted: true });
-  `;
-  return runJxa(script);
+  return runCli(['remove_item', listName, itemTitle]);
 }
 
 /**
  * Move a reminder item from one list to another.
  *
- * JXA has no native move operation, so this reads properties from the source
- * item, creates a new item in the target list, and deletes the source.
+ * EventKit supports direct calendar reassignment (no copy+delete needed).
  */
 export function moveRemindersItem(
   listName: string,
   itemTitle: string,
   targetList: string,
 ): Promise<RemindersResult> {
-  const safeListName = JSON.stringify(listName);
-  const safeItemTitle = JSON.stringify(itemTitle);
-  const safeTargetList = JSON.stringify(targetList);
-
-  const script = `
-    const app = Application("Reminders");
-    const srcList = app.lists.byName(${safeListName});
-    const items = srcList.reminders.whose({name: ${safeItemTitle}})();
-    if (items.length === 0) throw new Error("Reminder not found: " + ${safeItemTitle});
-    const src = items[0];
-    const props = {
-      name: src.name(),
-      body: src.body() || "",
-      completed: src.completed(),
-    };
-    if (src.dueDate()) props.dueDate = src.dueDate();
-    const tgtList = app.lists.byName(${safeTargetList});
-    const newItem = app.Reminder(props);
-    tgtList.reminders.push(newItem);
-    app.delete(src);
-    JSON.stringify({ moved: true, name: props.name });
-  `;
-  return runJxa(script);
+  return runCli(['move_item', listName, itemTitle, targetList]);
 }

@@ -17,7 +17,7 @@ export const TASKS_DIR = path.join(IPC_DIR, 'tasks');
 export const RESULTS_DIR = path.join(IPC_DIR, 'reminders_results');
 
 export const POLL_INTERVAL = 200; // ms
-export const POLL_TIMEOUT = 15_000; // ms
+export const POLL_TIMEOUT = 30_000; // ms
 
 // ---------------------------------------------------------------------------
 // Types
