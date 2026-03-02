@@ -65,7 +65,7 @@ function parseEvent(obj: DAVObject): ParsedEvent | null {
     const description: string | null = descVal ? String(descVal) : null;
 
     // All-day detection: ical.js Time objects have isDate property
-    const allDay = dtstart ? dtstart.isDate === true : false;
+    const allDay = dtstart ? (dtstart as { isDate?: boolean }).isDate === true : false;
 
     return {
       id: uid,
@@ -195,7 +195,7 @@ export async function handleListEvents(params: {
       for (const obj of objects) {
         const parsed = parseEvent(obj);
         if (parsed) {
-          parsed.calendarName = cal.displayName;
+          parsed.calendarName = String(cal.displayName ?? '');
           events.push(parsed);
         }
       }
@@ -246,7 +246,7 @@ export async function handleListUpcoming(params: {
       for (const obj of objects) {
         const parsed = parseEvent(obj);
         if (parsed) {
-          parsed.calendarName = cal.displayName;
+          parsed.calendarName = String(cal.displayName ?? '');
           events.push(parsed);
         }
       }

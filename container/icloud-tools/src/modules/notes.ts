@@ -30,7 +30,9 @@ export async function handleList(params: { folder?: string }) {
     const client = await getImapClient();
     const lock = await client.getMailboxLock(folder);
     try {
-      const total = client.mailbox.exists;
+      const mailbox = client.mailbox;
+      if (!mailbox) return ok([]);
+      const total = mailbox.exists;
       if (total === 0) {
         return ok([]);
       }
@@ -50,8 +52,8 @@ export async function handleList(params: { folder?: string }) {
 
         notes.push({
           id: String(msg.uid),
-          title: msg.envelope.subject ?? '',
-          date: msg.envelope.date?.toISOString?.() ?? String(msg.envelope.date ?? ''),
+          title: msg.envelope!.subject ?? '',
+          date: msg.envelope!.date?.toISOString?.() ?? String(msg.envelope!.date ?? ''),
           snippet: buildSnippet(body),
         });
       }
@@ -86,8 +88,8 @@ export async function handleRead(params: { id: string }) {
       const body = extractBody(source);
 
       return ok({
-        title: found.envelope.subject ?? '',
-        date: found.envelope.date?.toISOString?.() ?? String(found.envelope.date ?? ''),
+        title: found.envelope!.subject ?? '',
+        date: found.envelope!.date?.toISOString?.() ?? String(found.envelope!.date ?? ''),
         body,
       });
     } finally {

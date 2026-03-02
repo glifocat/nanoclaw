@@ -75,7 +75,9 @@ export async function handleListMessages(params: {
     const client = await getImapClient();
     const lock = await client.getMailboxLock(folder);
     try {
-      const total = client.mailbox.exists;
+      const mailbox = client.mailbox;
+      if (!mailbox) return ok([]);
+      const total = mailbox.exists;
       if (total === 0) {
         return ok([]);
       }
@@ -93,14 +95,14 @@ export async function handleListMessages(params: {
       }> = [];
 
       for await (const msg of client.fetch(range, { envelope: true, flags: true, uid: true })) {
-        const from = msg.envelope.from?.[0];
+        const from = msg.envelope!.from?.[0];
         messages.push({
           id: msg.uid,
-          subject: msg.envelope.subject ?? '',
+          subject: msg.envelope!.subject ?? '',
           sender: from?.address ?? '',
-          date: msg.envelope.date?.toISOString?.() ?? String(msg.envelope.date ?? ''),
-          read: msg.flags.has('\\Seen'),
-          flagged: msg.flags.has('\\Flagged'),
+          date: msg.envelope!.date?.toISOString?.() ?? String(msg.envelope!.date ?? ''),
+          read: msg.flags!.has('\\Seen'),
+          flagged: msg.flags!.has('\\Flagged'),
         });
       }
 
@@ -131,16 +133,16 @@ export async function handleReadMessage(params: { id: number }) {
       const source = found.source ? found.source.toString() : '';
       const body = extractBody(source);
 
-      const from = found.envelope.from?.[0];
-      const toAddrs = (found.envelope.to ?? []).map((a: { address?: string }) => a.address).filter(Boolean);
-      const ccAddrs = (found.envelope.cc ?? []).map((a: { address?: string }) => a.address).filter(Boolean);
+      const from = found.envelope!.from?.[0];
+      const toAddrs = (found.envelope!.to ?? []).map((a: { address?: string }) => a.address).filter(Boolean);
+      const ccAddrs = (found.envelope!.cc ?? []).map((a: { address?: string }) => a.address).filter(Boolean);
 
       return ok({
-        subject: found.envelope.subject ?? '',
+        subject: found.envelope!.subject ?? '',
         sender: from?.address ?? '',
         to: toAddrs,
         cc: ccAddrs,
-        date: found.envelope.date?.toISOString?.() ?? String(found.envelope.date ?? ''),
+        date: found.envelope!.date?.toISOString?.() ?? String(found.envelope!.date ?? ''),
         body,
       });
     } finally {
@@ -199,10 +201,10 @@ export async function handleReply(params: {
       return err(`Message ${params.id} not found`);
     }
 
-    const origSubject = original.envelope.subject ?? '';
+    const origSubject = original.envelope!.subject ?? '';
     const subject = origSubject.startsWith('Re:') ? origSubject : `Re: ${origSubject}`;
-    const from = original.envelope.from?.[0];
-    const messageId = original.envelope.messageId;
+    const from = original.envelope!.from?.[0];
+    const messageId = original.envelope!.messageId;
 
     const mailOptions: Record<string, unknown> = {
       to: from?.address ?? '',
@@ -212,7 +214,7 @@ export async function handleReply(params: {
     };
 
     if (params.reply_all) {
-      const ccAddrs = (original.envelope.cc ?? [])
+      const ccAddrs = (original.envelope!.cc ?? [])
         .map((a: { address?: string }) => a.address)
         .filter(Boolean);
       if (ccAddrs.length > 0) {
@@ -250,18 +252,18 @@ export async function handleForward(params: {
       return err(`Message ${params.id} not found`);
     }
 
-    const origSubject = original.envelope.subject ?? '';
+    const origSubject = original.envelope!.subject ?? '';
     const subject = origSubject.startsWith('Fwd:') ? origSubject : `Fwd: ${origSubject}`;
 
     const source = original.source ? original.source.toString() : '';
     const originalBody = extractBody(source);
 
-    const from = original.envelope.from?.[0];
+    const from = original.envelope!.from?.[0];
     const forwardedBlock = [
       '---------- Forwarded message ----------',
       `From: ${from?.address ?? ''}`,
       `Subject: ${origSubject}`,
-      `Date: ${original.envelope.date ?? ''}`,
+      `Date: ${original.envelope!.date ?? ''}`,
       '',
       originalBody,
     ].join('\n');
@@ -296,10 +298,11 @@ export async function handleSearch(params: {
     const client = await getImapClient();
     const lock = await client.getMailboxLock(folder);
     try {
-      const uids: number[] = await client.search(
+      const searchResult = await client.search(
         { or: [{ subject: params.query }, { from: params.query }, { body: params.query }] },
         { uid: true },
       );
+      const uids: number[] = searchResult || [];
 
       if (uids.length === 0) {
         return ok([]);
@@ -313,12 +316,12 @@ export async function handleSearch(params: {
       }> = [];
 
       for await (const msg of client.fetch(uids, { envelope: true, uid: true }, { uid: true })) {
-        const from = msg.envelope.from?.[0];
+        const from = msg.envelope!.from?.[0];
         results.push({
           id: msg.uid,
-          subject: msg.envelope.subject ?? '',
+          subject: msg.envelope!.subject ?? '',
           sender: from?.address ?? '',
-          date: msg.envelope.date?.toISOString?.() ?? String(msg.envelope.date ?? ''),
+          date: msg.envelope!.date?.toISOString?.() ?? String(msg.envelope!.date ?? ''),
         });
       }
 
@@ -351,7 +354,7 @@ export async function handleCreateDraft(params: {
 
     const result = await client.append('Drafts', rawMime, ['\\Draft']);
 
-    return ok({ success: true, id: result?.uid ?? null });
+    return ok({ success: true, id: result && typeof result !== 'boolean' ? result.uid : null });
   } catch (e) {
     return err(`Failed to create draft: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -379,8 +382,8 @@ export async function handleUpdateDraft(params: {
       return err(`Draft ${params.id} not found`);
     }
 
-    const origTo = original.envelope.to?.[0]?.address ?? '';
-    const origSubject = original.envelope.subject ?? '';
+    const origTo = original.envelope!.to?.[0]?.address ?? '';
+    const origSubject = original.envelope!.subject ?? '';
     const origSource = original.source ? original.source.toString() : '';
     const origBody = extractBody(origSource);
 
@@ -399,7 +402,7 @@ export async function handleUpdateDraft(params: {
 
     const result = await client.append('Drafts', rawMime, ['\\Draft']);
 
-    return ok({ success: true, id: result?.uid ?? null });
+    return ok({ success: true, id: result && typeof result !== 'boolean' ? result.uid : null });
   } catch (e) {
     return err(`Failed to update draft: ${e instanceof Error ? e.message : String(e)}`);
   }
