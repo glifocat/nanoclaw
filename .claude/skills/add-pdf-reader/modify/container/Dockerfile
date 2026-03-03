@@ -3,7 +3,7 @@
 
 FROM node:22-slim
 
-# Install system dependencies for Chromium and PDF tools
+# Install system dependencies for Chromium, PDF tools, and Python-based MCP servers
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -24,14 +24,20 @@ RUN apt-get update && apt-get install -y \
     curl \
     git \
     poppler-utils \
+    python3 \
+    python3-pip \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Chromium path for agent-browser
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
+# Install uv (Python package manager for MCP servers)
+RUN pip3 install --no-cache-dir uv --break-system-packages
+
 # Install agent-browser and claude-code globally
-RUN npm install -g agent-browser @anthropic-ai/claude-code
+RUN npm install -g agent-browser @anthropic-ai/claude-code @vantasdk/vanta-mcp-server
 
 # Install pdf-reader CLI tool
 COPY skills/pdf-reader/pdf-reader /usr/local/bin/pdf-reader
@@ -51,6 +57,18 @@ COPY agent-runner/ ./
 
 # Build TypeScript
 RUN npm run build
+
+# Build icloud-tools MCP server
+COPY icloud-tools/package*.json /opt/icloud-tools/
+RUN cd /opt/icloud-tools && npm install
+COPY icloud-tools/ /opt/icloud-tools/
+RUN cd /opt/icloud-tools && npx tsc && npm prune --omit=dev
+
+# Build apple-reminders MCP server (IPC bridge to host-side JXA)
+COPY apple-reminders-mcp/package*.json /opt/apple-reminders-mcp/
+RUN cd /opt/apple-reminders-mcp && npm install
+COPY apple-reminders-mcp/ /opt/apple-reminders-mcp/
+RUN cd /opt/apple-reminders-mcp && npx tsc && npm prune --omit=dev
 
 # Create workspace directories
 RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input

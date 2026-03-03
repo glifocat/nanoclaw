@@ -5,7 +5,7 @@ description: iCloud productivity tools (Reminders, Calendar, Contacts, Mail, Not
 
 # iCloud Tools Skill
 
-Gives NanoClaw agents access to Apple's productivity apps via iCloud's standard protocols using an app-specific password. Replaces the old JXA-based Apple Reminders integration.
+Gives NanoClaw agents access to Apple's productivity apps via iCloud's standard protocols using an app-specific password.
 
 ## Phase 1: Pre-flight
 
@@ -22,16 +22,15 @@ Available modules (set via `ICLOUD_MODULES` env var):
 
 | Module | Protocol | Tools | Description |
 |--------|----------|-------|-------------|
-| `reminders` | CalDAV | 7 | Lists, items, CRUD, move between lists |
 | `calendar` | CalDAV | 6 | Calendars, events, upcoming, CRUD |
 | `contacts` | CardDAV | 4 | Search, groups, create, update |
 | `mail` | IMAP/SMTP | 12 | Folders, read, send, reply, forward, drafts, flag, move |
 | `notes` | IMAP | 2 | List and read notes (read-only) |
 
 Examples:
-- Family group: `reminders,calendar`
+- Family group: `calendar,notes`
 - Work group: `mail,contacts,calendar`
-- All modules: `reminders,calendar,contacts,mail,notes`
+- All modules: `calendar,contacts,mail,notes`
 
 ## Phase 3: Configure Group
 
@@ -46,7 +45,7 @@ Add to the target group's `.mcp.json` (merge with existing entries):
       "env": {
         "ICLOUD_EMAIL": "${ICLOUD_EMAIL}",
         "ICLOUD_APP_PASSWORD": "${ICLOUD_APP_PASSWORD}",
-        "ICLOUD_MODULES": "reminders,calendar,contacts,mail,notes"
+        "ICLOUD_MODULES": "calendar,contacts,mail,notes"
       }
     }
   }
@@ -63,4 +62,4 @@ Customize `ICLOUD_MODULES` per group as needed.
 
 ## Phase 5: Verify
 
-Send a test message to the group, e.g., "List my reminder lists" or "What's on my calendar this week?"
+Send a test message to the group, e.g., "What's on my calendar this week?" or "Send an email to..."

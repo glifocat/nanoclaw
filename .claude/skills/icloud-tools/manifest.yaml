@@ -8,7 +8,6 @@ adds:
   - container/icloud-tools/src/server.ts
   - container/icloud-tools/src/auth.ts
   - container/icloud-tools/src/types.ts
-  - container/icloud-tools/src/modules/reminders.ts
   - container/icloud-tools/src/modules/calendar.ts
   - container/icloud-tools/src/modules/contacts.ts
   - container/icloud-tools/src/modules/mail.ts

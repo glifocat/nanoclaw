@@ -216,6 +216,7 @@ const SECRET_ENV_VARS = [
   'CLAUDE_CODE_OAUTH_TOKEN',
   'GOOGLE_OAUTH_CLIENT_ID',
   'GOOGLE_OAUTH_CLIENT_SECRET',
+  'ICLOUD_APP_PASSWORD',
 ];
 
 function createSanitizeBashHook(): HookCallback {
@@ -494,7 +495,9 @@ async function runQuery(
         'NotebookEdit',
         'mcp__nanoclaw__*',
         'mcp__vanta__*',
-        'mcp__google-workspace__*'
+        'mcp__google-workspace__*',
+        'mcp__icloud-tools__*',
+        'mcp__apple-reminders__*',
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',

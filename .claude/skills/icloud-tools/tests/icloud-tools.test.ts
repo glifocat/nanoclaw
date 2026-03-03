@@ -22,8 +22,7 @@ describe('icloud-tools skill package', () => {
       expect(content).toContain('description: iCloud productivity tools');
     });
 
-    it('documents all five modules', () => {
-      expect(content).toContain('`reminders`');
+    it('documents all four modules', () => {
       expect(content).toContain('`calendar`');
       expect(content).toContain('`contacts`');
       expect(content).toContain('`mail`');
@@ -82,7 +81,6 @@ describe('icloud-tools skill package', () => {
       expect(content).toContain('container/icloud-tools/src/server.ts');
       expect(content).toContain('container/icloud-tools/src/auth.ts');
       expect(content).toContain('container/icloud-tools/src/types.ts');
-      expect(content).toContain('container/icloud-tools/src/modules/reminders.ts');
       expect(content).toContain('container/icloud-tools/src/modules/calendar.ts');
       expect(content).toContain('container/icloud-tools/src/modules/contacts.ts');
       expect(content).toContain('container/icloud-tools/src/modules/mail.ts');
@@ -111,7 +109,6 @@ describe('icloud-tools skill package', () => {
       'container/icloud-tools/src/server.ts',
       'container/icloud-tools/src/auth.ts',
       'container/icloud-tools/src/types.ts',
-      'container/icloud-tools/src/modules/reminders.ts',
       'container/icloud-tools/src/modules/calendar.ts',
       'container/icloud-tools/src/modules/contacts.ts',
       'container/icloud-tools/src/modules/mail.ts',
@@ -152,7 +149,6 @@ describe('icloud-tools skill package', () => {
       'container/icloud-tools/src/server.ts',
       'container/icloud-tools/src/auth.ts',
       'container/icloud-tools/src/types.ts',
-      'container/icloud-tools/src/modules/reminders.ts',
       'container/icloud-tools/src/modules/calendar.ts',
       'container/icloud-tools/src/modules/contacts.ts',
       'container/icloud-tools/src/modules/mail.ts',
