@@ -281,6 +281,221 @@ describe('cancel_task authorization', () => {
   });
 });
 
+// --- update_task authorization ---
+
+describe('update_task authorization', () => {
+  beforeEach(() => {
+    createTask({
+      id: 'task-main',
+      group_folder: 'main',
+      chat_jid: 'main@g.us',
+      prompt: 'original main prompt',
+      schedule_type: 'cron',
+      schedule_value: '0 9 * * *',
+      context_mode: 'isolated',
+      next_run: '2025-06-01T09:00:00.000Z',
+      status: 'active',
+      created_at: '2024-01-01T00:00:00.000Z',
+    });
+    createTask({
+      id: 'task-other',
+      group_folder: 'other-group',
+      chat_jid: 'other@g.us',
+      prompt: 'original other prompt',
+      schedule_type: 'cron',
+      schedule_value: '30 8 * * *',
+      context_mode: 'group',
+      next_run: '2025-06-01T08:30:00.000Z',
+      status: 'active',
+      created_at: '2024-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('main group can update any task', async () => {
+    await processTaskIpc(
+      { type: 'update_task', taskId: 'task-other', prompt: 'updated by main' },
+      'main',
+      true,
+      deps,
+    );
+    expect(getTaskById('task-other')!.prompt).toBe('updated by main');
+  });
+
+  it('non-main group can update its own task', async () => {
+    await processTaskIpc(
+      { type: 'update_task', taskId: 'task-other', prompt: 'updated by self' },
+      'other-group',
+      false,
+      deps,
+    );
+    expect(getTaskById('task-other')!.prompt).toBe('updated by self');
+  });
+
+  it('non-main group cannot update another groups task', async () => {
+    await processTaskIpc(
+      { type: 'update_task', taskId: 'task-main', prompt: 'unauthorized' },
+      'other-group',
+      false,
+      deps,
+    );
+    expect(getTaskById('task-main')!.prompt).toBe('original main prompt');
+  });
+
+  it('silently fails for non-existent task', async () => {
+    await processTaskIpc(
+      { type: 'update_task', taskId: 'task-nonexistent', prompt: 'nope' },
+      'main',
+      true,
+      deps,
+    );
+    // No crash, no task created
+    expect(getTaskById('task-nonexistent')).toBeUndefined();
+  });
+});
+
+// --- update_task partial updates ---
+
+describe('update_task partial updates', () => {
+  beforeEach(() => {
+    createTask({
+      id: 'task-update',
+      group_folder: 'main',
+      chat_jid: 'main@g.us',
+      prompt: 'original prompt',
+      schedule_type: 'cron',
+      schedule_value: '30 8 * * *',
+      context_mode: 'group',
+      next_run: '2025-06-01T08:30:00.000Z',
+      status: 'active',
+      created_at: '2024-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('updates only prompt, preserves schedule and context_mode', async () => {
+    await processTaskIpc(
+      { type: 'update_task', taskId: 'task-update', prompt: 'new prompt' },
+      'main',
+      true,
+      deps,
+    );
+
+    const task = getTaskById('task-update')!;
+    expect(task.prompt).toBe('new prompt');
+    expect(task.schedule_type).toBe('cron');
+    expect(task.schedule_value).toBe('30 8 * * *');
+    expect(task.context_mode).toBe('group');
+    expect(task.id).toBe('task-update'); // ID preserved
+  });
+
+  it('updates only context_mode', async () => {
+    await processTaskIpc(
+      { type: 'update_task', taskId: 'task-update', context_mode: 'isolated' },
+      'main',
+      true,
+      deps,
+    );
+
+    const task = getTaskById('task-update')!;
+    expect(task.context_mode).toBe('isolated');
+    expect(task.prompt).toBe('original prompt');
+  });
+
+  it('updates schedule and recalculates next_run', async () => {
+    const before = Date.now();
+
+    await processTaskIpc(
+      {
+        type: 'update_task',
+        taskId: 'task-update',
+        schedule_type: 'interval',
+        schedule_value: '3600000',
+      },
+      'main',
+      true,
+      deps,
+    );
+
+    const task = getTaskById('task-update')!;
+    expect(task.schedule_type).toBe('interval');
+    expect(task.schedule_value).toBe('3600000');
+    // next_run should be ~1 hour from now, not the old cron value
+    const nextRun = new Date(task.next_run!).getTime();
+    expect(nextRun).toBeGreaterThanOrEqual(before + 3600000 - 1000);
+    expect(nextRun).toBeLessThanOrEqual(Date.now() + 3600000 + 1000);
+  });
+
+  it('updates prompt and schedule together', async () => {
+    await processTaskIpc(
+      {
+        type: 'update_task',
+        taskId: 'task-update',
+        prompt: 'new prompt with new schedule',
+        schedule_type: 'cron',
+        schedule_value: '0 10 * * *',
+      },
+      'main',
+      true,
+      deps,
+    );
+
+    const task = getTaskById('task-update')!;
+    expect(task.prompt).toBe('new prompt with new schedule');
+    expect(task.schedule_value).toBe('0 10 * * *');
+    expect(task.next_run).toBeTruthy();
+  });
+
+  it('rejects invalid cron on schedule update', async () => {
+    await processTaskIpc(
+      {
+        type: 'update_task',
+        taskId: 'task-update',
+        schedule_type: 'cron',
+        schedule_value: 'not a cron',
+      },
+      'main',
+      true,
+      deps,
+    );
+
+    // Original values preserved
+    const task = getTaskById('task-update')!;
+    expect(task.schedule_value).toBe('30 8 * * *');
+  });
+
+  it('re-activates completed once task when schedule changes', async () => {
+    // Simulate a completed once task
+    createTask({
+      id: 'task-completed',
+      group_folder: 'main',
+      chat_jid: 'main@g.us',
+      prompt: 'done',
+      schedule_type: 'once',
+      schedule_value: '2025-01-01T00:00:00',
+      context_mode: 'isolated',
+      next_run: null,
+      status: 'completed',
+      created_at: '2024-01-01T00:00:00.000Z',
+    });
+
+    await processTaskIpc(
+      {
+        type: 'update_task',
+        taskId: 'task-completed',
+        schedule_type: 'cron',
+        schedule_value: '0 9 * * *',
+      },
+      'main',
+      true,
+      deps,
+    );
+
+    const task = getTaskById('task-completed')!;
+    expect(task.status).toBe('active');
+    expect(task.schedule_type).toBe('cron');
+    expect(task.next_run).toBeTruthy();
+  });
+});
+
 // --- register_group authorization ---
 
 describe('register_group authorization', () => {

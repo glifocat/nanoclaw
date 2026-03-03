@@ -325,6 +325,90 @@ export async function processTaskIpc(
       }
       break;
 
+    case 'update_task':
+      if (data.taskId) {
+        const task = getTaskById(data.taskId);
+        if (!task) {
+          logger.warn(
+            { taskId: data.taskId, sourceGroup },
+            'update_task: task not found',
+          );
+          break;
+        }
+        if (!(isMain || task.group_folder === sourceGroup)) {
+          logger.warn(
+            { taskId: data.taskId, sourceGroup },
+            'Unauthorized task update attempt',
+          );
+          break;
+        }
+
+        const updates: Parameters<typeof updateTask>[1] = {};
+
+        if (data.prompt !== undefined) {
+          updates.prompt = data.prompt;
+        }
+        if (data.context_mode === 'group' || data.context_mode === 'isolated') {
+          updates.context_mode = data.context_mode;
+        }
+
+        // If schedule changes, recalculate next_run
+        if (data.schedule_type && data.schedule_value) {
+          const newType = data.schedule_type as 'cron' | 'interval' | 'once';
+          updates.schedule_type = newType;
+          updates.schedule_value = data.schedule_value;
+
+          let nextRun: string | null = null;
+          if (newType === 'cron') {
+            try {
+              const interval = CronExpressionParser.parse(data.schedule_value, {
+                tz: TIMEZONE,
+              });
+              nextRun = interval.next().toISOString();
+            } catch {
+              logger.warn(
+                { taskId: data.taskId, scheduleValue: data.schedule_value },
+                'update_task: invalid cron expression',
+              );
+              break;
+            }
+          } else if (newType === 'interval') {
+            const ms = parseInt(data.schedule_value, 10);
+            if (isNaN(ms) || ms <= 0) {
+              logger.warn(
+                { taskId: data.taskId, scheduleValue: data.schedule_value },
+                'update_task: invalid interval',
+              );
+              break;
+            }
+            nextRun = new Date(Date.now() + ms).toISOString();
+          } else if (newType === 'once') {
+            const scheduled = new Date(data.schedule_value);
+            if (isNaN(scheduled.getTime())) {
+              logger.warn(
+                { taskId: data.taskId, scheduleValue: data.schedule_value },
+                'update_task: invalid timestamp',
+              );
+              break;
+            }
+            nextRun = scheduled.toISOString();
+          }
+          updates.next_run = nextRun;
+
+          // Re-activate completed 'once' tasks that get a new schedule
+          if (task.status === 'completed') {
+            updates.status = 'active';
+          }
+        }
+
+        updateTask(data.taskId, updates);
+        logger.info(
+          { taskId: data.taskId, sourceGroup, updatedFields: Object.keys(updates) },
+          'Task updated via IPC',
+        );
+      }
+      break;
+
     case 'refresh_groups':
       // Only main group can request a refresh
       if (isMain) {
