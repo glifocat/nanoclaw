@@ -139,6 +139,8 @@ describe('tool handlers', () => {
       title: 'Buy eggs',
       notes: 'organic',
       dueDate: '2026-03-05',
+      priority: undefined,
+      url: undefined,
     });
   });
 
@@ -160,6 +162,59 @@ describe('tool handlers', () => {
       title: 'Buy eggs',
       notes: undefined,
       dueDate: undefined,
+      priority: undefined,
+      url: undefined,
+    });
+  });
+
+  it('add_item maps metadata fields (priority, url)', async () => {
+    mockCallReminders.mockResolvedValue({
+      success: true,
+      message: 'OK',
+      data: { name: 'Task', priority: 'high', url: 'https://example.com' },
+    });
+
+    const server = createServer();
+    await callTool(server, 'add_item', {
+      list_name: 'Work',
+      title: 'Task',
+      priority: 'high',
+      url: 'https://example.com',
+    });
+
+    expect(mockCallReminders).toHaveBeenCalledWith('add_item', {
+      listName: 'Work',
+      title: 'Task',
+      notes: undefined,
+      dueDate: undefined,
+      priority: 'high',
+      url: 'https://example.com',
+    });
+  });
+
+  it('update_item maps metadata update fields', async () => {
+    mockCallReminders.mockResolvedValue({
+      success: true,
+      message: 'OK',
+      data: { name: 'Updated', priority: 'low' },
+    });
+
+    const server = createServer();
+    await callTool(server, 'update_item', {
+      list_name: 'Shopping',
+      item_title: 'Buy eggs',
+      new_priority: 'low',
+      new_url: 'https://example.com',
+    });
+
+    expect(mockCallReminders).toHaveBeenCalledWith('update_item', {
+      listName: 'Shopping',
+      itemTitle: 'Buy eggs',
+      newTitle: undefined,
+      newNotes: undefined,
+      newDueDate: undefined,
+      newPriority: 'low',
+      newUrl: 'https://example.com',
     });
   });
 
@@ -185,6 +240,8 @@ describe('tool handlers', () => {
       newTitle: 'Buy organic eggs',
       newNotes: 'from farmers market',
       newDueDate: '2026-03-10',
+      newPriority: undefined,
+      newUrl: undefined,
     });
   });
 
