@@ -23,13 +23,16 @@ function buildRawMime(fields: {
   cc?: string;
   bcc?: string;
 }): string {
-  const lines: string[] = [
+  const senderEmail = process.env.ICLOUD_SENDER_EMAIL;
+  const lines: string[] = [];
+  if (senderEmail) lines.push(`From: ${senderEmail}`);
+  lines.push(
     `To: ${fields.to}`,
     `Subject: ${fields.subject}`,
     `MIME-Version: 1.0`,
     `Content-Type: text/plain; charset=utf-8`,
     `Date: ${new Date().toUTCString()}`,
-  ];
+  );
 
   if (fields.cc) {
     lines.push(`Cc: ${fields.cc}`);
@@ -157,6 +160,7 @@ export async function handleSend(params: {
   to: string;
   subject: string;
   body: string;
+  from?: string;
   cc?: string;
   bcc?: string;
 }) {
@@ -169,6 +173,7 @@ export async function handleSend(params: {
       text: params.body,
     };
 
+    if (params.from) mailOptions.from = params.from;
     if (params.cc) mailOptions.cc = params.cc;
     if (params.bcc) mailOptions.bcc = params.bcc;
 
@@ -206,12 +211,14 @@ export async function handleReply(params: {
     const from = original.envelope!.from?.[0];
     const messageId = original.envelope!.messageId;
 
+    const replyFrom = process.env.ICLOUD_SENDER_EMAIL;
     const mailOptions: Record<string, unknown> = {
       to: from?.address ?? '',
       subject,
       text: params.body,
       inReplyTo: messageId,
     };
+    if (replyFrom) mailOptions.from = replyFrom;
 
     if (params.reply_all) {
       const ccAddrs = (original.envelope!.cc ?? [])
@@ -275,12 +282,16 @@ export async function handleForward(params: {
     }
     textParts.push(forwardedBlock);
 
-    const transport = getSmtpTransport();
-    const info = await transport.sendMail({
+    const fwdFrom = process.env.ICLOUD_SENDER_EMAIL;
+    const fwdOptions: Record<string, unknown> = {
       to: params.to,
       subject,
       text: textParts.join('\n'),
-    });
+    };
+    if (fwdFrom) fwdOptions.from = fwdFrom;
+
+    const transport = getSmtpTransport();
+    const info = await transport.sendMail(fwdOptions);
 
     return ok({ success: true, messageId: info.messageId });
   } catch (e) {
@@ -499,6 +510,7 @@ export function registerMail(server: McpServer): void {
       to: z.string().describe('Recipient email address(es)'),
       subject: z.string().describe('Email subject line'),
       body: z.string().describe('Email body text'),
+      from: z.string().optional().describe('Sender email address (defaults to ICLOUD_SENDER_EMAIL or account email)'),
       cc: z.string().optional().describe('CC recipient(s)'),
       bcc: z.string().optional().describe('BCC recipient(s)'),
     },

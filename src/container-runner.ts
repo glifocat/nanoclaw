@@ -198,6 +198,7 @@ function readSecrets(): Record<string, string> {
     'PASSION_GOOGLE_EMAIL',
     'ICLOUD_EMAIL',
     'ICLOUD_APP_PASSWORD',
+    'ICLOUD_SENDER_EMAIL',
   ]);
 }
 

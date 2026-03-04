@@ -66,6 +66,7 @@ export async function getImapClient(): Promise<ImapFlow> {
 export function getSmtpTransport(): Transporter {
   if (!smtpTransport) {
     const creds = getCredentials();
+    const senderEmail = process.env.ICLOUD_SENDER_EMAIL || creds.username;
     smtpTransport = createTransport(
       {
         host: 'smtp.mail.me.com',
@@ -73,7 +74,7 @@ export function getSmtpTransport(): Transporter {
         secure: false,
         auth: { user: creds.username, pass: creds.password },
       },
-      { from: creds.username },
+      { from: senderEmail },
     );
   }
   return smtpTransport;
