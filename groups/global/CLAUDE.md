@@ -11,6 +11,7 @@ This context applies to all groups. Your name, personality, and language are def
 - Run bash commands in your sandbox
 - Schedule tasks to run later or on a recurring basis
 - Send messages back to the chat
+- **Apple Reminders** — list, add, update, complete, remove, and move items in any Apple Reminders list (via `mcp__apple-reminders__*` tools). Items include priority, url, due dates, tags, and creation/completion dates.
 
 ## Communication
 

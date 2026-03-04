@@ -116,13 +116,11 @@ export function addRemindersItem(
   notes?: string,
   dueDate?: string,
   priority?: string,
-  url?: string,
 ): Promise<RemindersResult> {
   const args = ['add_item', listName, title];
   if (notes !== undefined) args.push('--notes', notes);
   if (dueDate !== undefined) args.push('--due', dueDate);
   if (priority !== undefined) args.push('--priority', priority);
-  if (url !== undefined) args.push('--url', url);
   return runCli(args);
 }
 
@@ -137,15 +135,13 @@ export function updateRemindersItem(
     newNotes?: string;
     newDueDate?: string;
     newPriority?: string;
-    newUrl?: string;
   },
 ): Promise<RemindersResult> {
   if (
     !updates.newTitle &&
     !updates.newNotes &&
     !updates.newDueDate &&
-    !updates.newPriority &&
-    !updates.newUrl
+    !updates.newPriority
   ) {
     return Promise.resolve({
       success: false,
@@ -158,7 +154,6 @@ export function updateRemindersItem(
   if (updates.newNotes !== undefined) args.push('--new-notes', updates.newNotes);
   if (updates.newDueDate !== undefined) args.push('--new-due', updates.newDueDate);
   if (updates.newPriority !== undefined) args.push('--new-priority', updates.newPriority);
-  if (updates.newUrl !== undefined) args.push('--new-url', updates.newUrl);
   return runCli(args);
 }
 

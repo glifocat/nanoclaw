@@ -193,28 +193,16 @@ describe('addRemindersItem', () => {
     expect(args).toEqual(['add_item', 'Work', 'Task', '--priority', 'high']);
   });
 
-  it('creates item with url', async () => {
-    mockCliSuccess({ name: 'Task', url: 'https://example.com' });
-
-    const result = await addRemindersItem('Work', 'Task', undefined, undefined, undefined, 'https://example.com');
-
-    expect(result.success).toBe(true);
-    const args = getCliArgs();
-    expect(args).toEqual(['add_item', 'Work', 'Task', '--url', 'https://example.com']);
-  });
-
   it('creates item with all metadata fields', async () => {
     mockCliSuccess({ name: 'Full item' });
 
-    await addRemindersItem('Work', 'Full item', 'notes here', '2026-04-01T09:00:00', 'medium', 'https://example.com');
+    await addRemindersItem('Work', 'Full item', 'notes here', '2026-04-01T09:00:00', 'medium');
 
     const args = getCliArgs();
     expect(args).toContain('--notes');
     expect(args).toContain('--due');
     expect(args).toContain('--priority');
     expect(args).toContain('medium');
-    expect(args).toContain('--url');
-    expect(args).toContain('https://example.com');
   });
 });
 
@@ -302,23 +290,11 @@ describe('updateRemindersItem', () => {
     expect(args).toContain('high');
   });
 
-  it('updates url of existing item', async () => {
-    mockCliSuccess({ name: 'Item', url: 'https://example.com' });
-
-    const result = await updateRemindersItem('Shopping', 'Item', { newUrl: 'https://example.com' });
-
-    expect(result.success).toBe(true);
-    const args = getCliArgs();
-    expect(args).toContain('--new-url');
-    expect(args).toContain('https://example.com');
-  });
-
-  it('allows update with only new metadata fields (no original fields)', async () => {
+  it('allows update with only priority field', async () => {
     mockCliSuccess({ name: 'Item', priority: 'low' });
 
     const result = await updateRemindersItem('Shopping', 'Item', {
       newPriority: 'low',
-      newUrl: 'https://example.com',
     });
 
     expect(result.success).toBe(true);
