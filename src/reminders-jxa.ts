@@ -115,10 +115,14 @@ export function addRemindersItem(
   title: string,
   notes?: string,
   dueDate?: string,
+  priority?: string,
+  url?: string,
 ): Promise<RemindersResult> {
   const args = ['add_item', listName, title];
   if (notes !== undefined) args.push('--notes', notes);
   if (dueDate !== undefined) args.push('--due', dueDate);
+  if (priority !== undefined) args.push('--priority', priority);
+  if (url !== undefined) args.push('--url', url);
   return runCli(args);
 }
 

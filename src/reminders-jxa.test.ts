@@ -182,6 +182,40 @@ describe('addRemindersItem', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('creates item with priority flag', async () => {
+    mockCliSuccess({ name: 'Task', priority: 'high' });
+
+    const result = await addRemindersItem('Work', 'Task', undefined, undefined, 'high');
+
+    expect(result.success).toBe(true);
+    const args = getCliArgs();
+    expect(args).toEqual(['add_item', 'Work', 'Task', '--priority', 'high']);
+  });
+
+  it('creates item with url', async () => {
+    mockCliSuccess({ name: 'Task', url: 'https://example.com' });
+
+    const result = await addRemindersItem('Work', 'Task', undefined, undefined, undefined, 'https://example.com');
+
+    expect(result.success).toBe(true);
+    const args = getCliArgs();
+    expect(args).toEqual(['add_item', 'Work', 'Task', '--url', 'https://example.com']);
+  });
+
+  it('creates item with all metadata fields', async () => {
+    mockCliSuccess({ name: 'Full item' });
+
+    await addRemindersItem('Work', 'Full item', 'notes here', '2026-04-01T09:00:00', 'medium', 'https://example.com');
+
+    const args = getCliArgs();
+    expect(args).toContain('--notes');
+    expect(args).toContain('--due');
+    expect(args).toContain('--priority');
+    expect(args).toContain('medium');
+    expect(args).toContain('--url');
+    expect(args).toContain('https://example.com');
+  });
 });
 
 // --- updateRemindersItem ---
