@@ -279,7 +279,9 @@ describe('handleRemindersIpc - reminders_add_item', () => {
     );
 
     expect(result).toBe(true);
-    expect(addRemindersItem).toHaveBeenCalledWith('Shopping', 'Buy eggs', 'organic', '2026-03-05');
+    expect(addRemindersItem).toHaveBeenCalledWith(
+      'Shopping', 'Buy eggs', 'organic', '2026-03-05', undefined, undefined,
+    );
   });
 
   it('dispatches without optional params', async () => {
@@ -297,7 +299,33 @@ describe('handleRemindersIpc - reminders_add_item', () => {
       DATA_DIR,
     );
 
-    expect(addRemindersItem).toHaveBeenCalledWith('Shopping', 'Buy eggs', undefined, undefined);
+    expect(addRemindersItem).toHaveBeenCalledWith(
+      'Shopping', 'Buy eggs', undefined, undefined, undefined, undefined,
+    );
+  });
+
+  it('forwards metadata fields (priority, url)', async () => {
+    vi.mocked(addRemindersItem).mockResolvedValue(
+      okResult({ name: 'Task', priority: 'high', url: 'https://example.com' }),
+    );
+
+    await handleRemindersIpc(
+      {
+        type: 'reminders_add_item',
+        requestId: 'req-add-meta-1',
+        listName: 'Work',
+        title: 'Task',
+        priority: 'high',
+        url: 'https://example.com',
+      },
+      SOURCE_GROUP,
+      false,
+      DATA_DIR,
+    );
+
+    expect(addRemindersItem).toHaveBeenCalledWith(
+      'Work', 'Task', undefined, undefined, 'high', 'https://example.com',
+    );
   });
 
   it('writes error result when required params are missing', async () => {
@@ -361,6 +389,34 @@ describe('handleRemindersIpc - reminders_update_item', () => {
       newTitle: 'Buy organic eggs',
       newNotes: 'from farmers market',
       newDueDate: '2026-03-10',
+      newPriority: undefined,
+      newUrl: undefined,
+    });
+  });
+
+  it('forwards metadata update fields (newPriority, newUrl)', async () => {
+    vi.mocked(updateRemindersItem).mockResolvedValue(okResult({ name: 'Updated' }));
+
+    await handleRemindersIpc(
+      {
+        type: 'reminders_update_item',
+        requestId: 'req-upd-meta-1',
+        listName: 'Shopping',
+        itemTitle: 'Buy eggs',
+        newPriority: 'low',
+        newUrl: 'https://example.com',
+      },
+      SOURCE_GROUP,
+      false,
+      DATA_DIR,
+    );
+
+    expect(updateRemindersItem).toHaveBeenCalledWith('Shopping', 'Buy eggs', {
+      newTitle: undefined,
+      newNotes: undefined,
+      newDueDate: undefined,
+      newPriority: 'low',
+      newUrl: 'https://example.com',
     });
   });
 

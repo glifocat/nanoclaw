@@ -95,6 +95,11 @@ export function createServer(): McpServer {
         .string()
         .optional()
         .describe('Optional due date (YYYY-MM-DD or ISO 8601)'),
+      priority: z
+        .enum(['none', 'low', 'medium', 'high'])
+        .optional()
+        .describe('Priority level (default: none)'),
+      url: z.string().optional().describe('Optional URL to attach to the reminder'),
     },
     async (args) => {
       const result = await callReminders('add_item', {
@@ -102,6 +107,8 @@ export function createServer(): McpServer {
         title: args.title,
         notes: args.notes,
         dueDate: args.due_date,
+        priority: args.priority,
+        url: args.url,
       });
       if (!result.success) return err(result.message);
       return ok(result.data);
@@ -125,6 +132,11 @@ export function createServer(): McpServer {
         .string()
         .optional()
         .describe('New due date (YYYY-MM-DD or ISO 8601)'),
+      new_priority: z
+        .enum(['none', 'low', 'medium', 'high'])
+        .optional()
+        .describe('New priority level'),
+      new_url: z.string().optional().describe('New URL to attach'),
     },
     async (args) => {
       const result = await callReminders('update_item', {
@@ -133,6 +145,8 @@ export function createServer(): McpServer {
         newTitle: args.new_title,
         newNotes: args.new_notes,
         newDueDate: args.new_due_date,
+        newPriority: args.new_priority,
+        newUrl: args.new_url,
       });
       if (!result.success) return err(result.message);
       return ok(result.data);
