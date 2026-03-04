@@ -40,6 +40,8 @@ Single Node.js process that connects to WhatsApp, routes messages to Claude Agen
 | `/update` | **Do not use on this fork** — overwrites local customizations. Use `git fetch origin && git merge origin/main` instead |
 | `/qodo-pr-resolver` | Fetch and fix Qodo PR review issues interactively or in batch |
 | `/get-qodo-rules` | Load org- and repo-level coding rules from Qodo before code tasks |
+| `/backup` | Back up NanoClaw state (WhatsApp session, databases, groups, secrets) to local or NAS path |
+| `/apple-reminders` | Apple Reminders integration setup, testing, and troubleshooting |
 
 ## Development
 
@@ -89,6 +91,7 @@ docker builder prune -af   # or: container system prune (Apple Container)
 - **Dockerfile `npm install --omit=dev` breaks `npx tsc`**: TypeScript is a devDependency. Must `npm install` (full), then `npx tsc`, then `npm prune --omit=dev` to reduce image size. Applies to all MCP server builds in the Dockerfile.
 - **Real database is `store/messages.db`**: Not `data/nanoclaw.db` or `data/messages.db` — those are empty 0-byte stubs. The `STORE_DIR` config points to `store/`.
 - **DB schema**: If skipping sync-groups step (e.g. self-chat setup), the database tables don't exist yet. Must create schema manually before registering channels.
+- **Session JSONL path**: `data/sessions/{group}/.claude/projects/-workspace-group/{sessionId}.jsonl`. The `-workspace-group` project ID is derived from the container's cwd `/workspace/group`. Session rotation at 5 MB threshold in `runAgent()` (PR #28).
 
 ### Containers & MCP
 - **Container mounts are not hot-reloaded**: Mounts (including `additionalMounts`, `settings.json`, and the mount allowlist) are assigned at container spawn time. If you change mounts/config, you MUST kill the running container (`container stop nanoclaw-{group}-*`) — otherwise the old container keeps serving via IPC and new mounts never take effect. The mount allowlist itself is cached in memory by the host process, so a service restart is also needed after editing `~/.config/nanoclaw/mount-allowlist.json`.
@@ -111,10 +114,15 @@ docker builder prune -af   # or: container system prune (Apple Container)
 
 ### Apple Reminders
 - **JXA/osascript is extremely slow**: Apple Event IPC overhead makes batch property access take 23-50s for 255 items. The `tools/reminders-cli/` Swift EventKit CLI bypasses Apple Events entirely (~0.6s). Rebuild with `tools/reminders-cli/build.sh` (requires macOS + Xcode CLT).
+- **EventKit API limitations**: Only `priority` maps to the Reminders app UI. `EKCalendarItem.url` is a legacy CalDAV property disconnected from the UI URL field (no public API can set it). `isFlagged` doesn't exist in EventKit (but works via JXA). Tags are private/internal — `#hashtag` parsing from notes is the only workaround. Don't add these fields back without private API or database access.
+- **JXA exposes different properties**: AppleScript's `TTRMScriptableReminder` has `flagged` (r/w) which EventKit lacks. Full sdef: name, id, body, completed, completionDate, creationDate, modificationDate, dueDate, alldayDueDate, remindMeDate, priority, flagged, container. No url or tags.
 
 ### Skills Engine
 - **Skills engine init**: `apply-skill.ts` doesn't support `--init` flag. Initialize with: `npx tsx -e "import { initNanoclawDir } from './skills-engine/init.ts'; initNanoclawDir();"`
 - **Modify templates must match live files**: When multiple skills modify the same file, ALL modify templates should be identical copies of the live file. This prevents three-way merge conflicts in CI combination tests. See PR #23.
+- **Skills engine test timeout on VM**: `apply.ts` runs tests via `execSync` with `stdio: 'pipe'` and 120s timeout. Pipe buffer can deadlock, causing `ETIMEDOUT` even when tests pass interactively. Workaround: set `test: ""` in manifest.yaml during application, run tests manually after.
+- **Modify templates go stale when base files evolve**: After upstream adds new exports/imports to a file (e.g. `fetchLatestWaWebVersion` added to whatsapp.ts), all skills with `modify/` templates for that file need their templates AND test mocks updated. No automated staleness detection exists.
+- **Upstream pre-commit hooks (Husky)**: When committing against `origin/main` (e.g. in worktrees), Prettier runs and may modify `package-lock.json`. Check `git diff --name-only HEAD~1` after commit and amend out unwanted files.
 
 ## Git Remotes & Workflow
 
@@ -131,6 +139,20 @@ Three remotes, each with a specific purpose:
 - Sync upstream: `git fetch origin && git merge origin/main` (on a feature branch, then PR)
 - Sync public fork: `git push --no-verify fork origin/main:main` (only upstream code, never personal)
 - **Default remote is always `private`** unless user explicitly says otherwise
+
+## Upstream Contributions
+
+Classic token (`ghp_`) can create issues and edit PRs on `qwibitai/nanoclaw`. Cross-fork PR creation still requires GitHub web UI.
+Must `source /Users/ethanmunoz/personal-projects/.envrc` in Bash tool if env is stale (e.g. after token rotation).
+Use worktrees to prepare contributions against upstream without disturbing local state:
+```bash
+git worktree add /tmp/nanoclaw-<topic> -b upstream/<branch> origin/main
+# ... make changes, commit ...
+git push --no-verify fork upstream/<branch>
+# Create upstream PR via: https://github.com/qwibitai/nanoclaw/compare/main...glifocat:nanoclaw:<branch>
+git worktree remove /tmp/nanoclaw-<topic>
+```
+To update an existing upstream PR, force-push to its source branch on fork.
 
 ## Update Strategy
 
@@ -178,9 +200,8 @@ Reference implementations: Google Workspace + Vanta in `groups/passion/.mcp.json
 
 ## Checking CI Status
 
-`gh pr checks` fails with "Resource not accessible by personal access token". Use the Actions REST API:
+`gh pr checks <number> --repo qwibitai/nanoclaw` works with the classic token. For private repo CI:
 
 ```bash
-gh api repos/glifocat/nanoclaw-personal/actions/runs \
-  --jq '.workflow_runs[:6] | .[] | {name: .name, status: .status, conclusion: .conclusion, head_sha: .head_sha[:7]}'
+gh pr checks <number> --repo glifocat/nanoclaw-personal
 ```
