@@ -132,9 +132,21 @@ export function addRemindersItem(
 export function updateRemindersItem(
   listName: string,
   itemTitle: string,
-  updates: { newTitle?: string; newNotes?: string; newDueDate?: string },
+  updates: {
+    newTitle?: string;
+    newNotes?: string;
+    newDueDate?: string;
+    newPriority?: string;
+    newUrl?: string;
+  },
 ): Promise<RemindersResult> {
-  if (!updates.newTitle && !updates.newNotes && !updates.newDueDate) {
+  if (
+    !updates.newTitle &&
+    !updates.newNotes &&
+    !updates.newDueDate &&
+    !updates.newPriority &&
+    !updates.newUrl
+  ) {
     return Promise.resolve({
       success: false,
       message: 'No update fields provided',
@@ -145,6 +157,8 @@ export function updateRemindersItem(
   if (updates.newTitle !== undefined) args.push('--new-title', updates.newTitle);
   if (updates.newNotes !== undefined) args.push('--new-notes', updates.newNotes);
   if (updates.newDueDate !== undefined) args.push('--new-due', updates.newDueDate);
+  if (updates.newPriority !== undefined) args.push('--new-priority', updates.newPriority);
+  if (updates.newUrl !== undefined) args.push('--new-url', updates.newUrl);
   return runCli(args);
 }
 

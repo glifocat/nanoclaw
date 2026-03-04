@@ -290,6 +290,40 @@ describe('updateRemindersItem', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('updates priority of existing item', async () => {
+    mockCliSuccess({ name: 'Item', priority: 'high' });
+
+    const result = await updateRemindersItem('Shopping', 'Item', { newPriority: 'high' });
+
+    expect(result.success).toBe(true);
+    const args = getCliArgs();
+    expect(args).toContain('--new-priority');
+    expect(args).toContain('high');
+  });
+
+  it('updates url of existing item', async () => {
+    mockCliSuccess({ name: 'Item', url: 'https://example.com' });
+
+    const result = await updateRemindersItem('Shopping', 'Item', { newUrl: 'https://example.com' });
+
+    expect(result.success).toBe(true);
+    const args = getCliArgs();
+    expect(args).toContain('--new-url');
+    expect(args).toContain('https://example.com');
+  });
+
+  it('allows update with only new metadata fields (no original fields)', async () => {
+    mockCliSuccess({ name: 'Item', priority: 'low' });
+
+    const result = await updateRemindersItem('Shopping', 'Item', {
+      newPriority: 'low',
+      newUrl: 'https://example.com',
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockExecFile).toHaveBeenCalled();
+  });
 });
 
 // --- completeRemindersItem ---
