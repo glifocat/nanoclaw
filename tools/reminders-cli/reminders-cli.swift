@@ -94,15 +94,27 @@ func fetchReminders(calendar: EKCalendar, includeCompleted: Bool) -> [EKReminder
     return result
 }
 
+func extractTags(_ text: String?) -> [String] {
+    guard let text = text else { return [] }
+    let regex = try! NSRegularExpression(pattern: "#(\\w+)", options: [])
+    let range = NSRange(text.startIndex..., in: text)
+    return regex.matches(in: text, range: range).compactMap { match in
+        guard let r = Range(match.range(at: 1), in: text) else { return nil }
+        return String(text[r])
+    }
+}
+
 func reminderToDict(_ r: EKReminder) -> [String: Any] {
+    let notes = r.notes ?? ""
     var d: [String: Any] = [
         "name": r.title ?? "",
-        "notes": r.notes ?? "",
+        "notes": notes,
         "completed": r.isCompleted,
         "priority": priorityToString(r.priority),
         "url": r.url?.absoluteString as Any? ?? NSNull(),
         "creationDate": dateToISO(r.creationDate),
         "completionDate": dateToISO(r.completionDate),
+        "tags": extractTags(r.notes),
     ]
     if let dc = r.dueDateComponents, let date = Calendar.current.date(from: dc) {
         let fmt = ISO8601DateFormatter()
