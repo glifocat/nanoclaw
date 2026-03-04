@@ -140,7 +140,6 @@ describe('tool handlers', () => {
       notes: 'organic',
       dueDate: '2026-03-05',
       priority: undefined,
-      url: undefined,
     });
   });
 
@@ -163,15 +162,14 @@ describe('tool handlers', () => {
       notes: undefined,
       dueDate: undefined,
       priority: undefined,
-      url: undefined,
     });
   });
 
-  it('add_item maps metadata fields (priority, url)', async () => {
+  it('add_item maps priority metadata field', async () => {
     mockCallReminders.mockResolvedValue({
       success: true,
       message: 'OK',
-      data: { name: 'Task', priority: 'high', url: 'https://example.com' },
+      data: { name: 'Task', priority: 'high' },
     });
 
     const server = createServer();
@@ -179,7 +177,6 @@ describe('tool handlers', () => {
       list_name: 'Work',
       title: 'Task',
       priority: 'high',
-      url: 'https://example.com',
     });
 
     expect(mockCallReminders).toHaveBeenCalledWith('add_item', {
@@ -188,11 +185,10 @@ describe('tool handlers', () => {
       notes: undefined,
       dueDate: undefined,
       priority: 'high',
-      url: 'https://example.com',
     });
   });
 
-  it('update_item maps metadata update fields', async () => {
+  it('update_item maps priority metadata update field', async () => {
     mockCallReminders.mockResolvedValue({
       success: true,
       message: 'OK',
@@ -204,7 +200,6 @@ describe('tool handlers', () => {
       list_name: 'Shopping',
       item_title: 'Buy eggs',
       new_priority: 'low',
-      new_url: 'https://example.com',
     });
 
     expect(mockCallReminders).toHaveBeenCalledWith('update_item', {
@@ -214,7 +209,6 @@ describe('tool handlers', () => {
       newNotes: undefined,
       newDueDate: undefined,
       newPriority: 'low',
-      newUrl: 'https://example.com',
     });
   });
 
@@ -241,7 +235,6 @@ describe('tool handlers', () => {
       newNotes: 'from farmers market',
       newDueDate: '2026-03-10',
       newPriority: undefined,
-      newUrl: undefined,
     });
   });
 

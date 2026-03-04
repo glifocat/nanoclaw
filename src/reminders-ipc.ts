@@ -115,7 +115,6 @@ export async function handleRemindersIpc(
         data.notes as string | undefined,
         data.dueDate as string | undefined,
         data.priority as string | undefined,
-        data.url as string | undefined,
       );
       break;
     }
@@ -130,7 +129,6 @@ export async function handleRemindersIpc(
         newNotes: data.newNotes as string | undefined,
         newDueDate: data.newDueDate as string | undefined,
         newPriority: data.newPriority as string | undefined,
-        newUrl: data.newUrl as string | undefined,
       });
       break;
     }

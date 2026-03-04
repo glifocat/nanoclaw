@@ -280,7 +280,7 @@ describe('handleRemindersIpc - reminders_add_item', () => {
 
     expect(result).toBe(true);
     expect(addRemindersItem).toHaveBeenCalledWith(
-      'Shopping', 'Buy eggs', 'organic', '2026-03-05', undefined, undefined,
+      'Shopping', 'Buy eggs', 'organic', '2026-03-05', undefined,
     );
   });
 
@@ -300,13 +300,13 @@ describe('handleRemindersIpc - reminders_add_item', () => {
     );
 
     expect(addRemindersItem).toHaveBeenCalledWith(
-      'Shopping', 'Buy eggs', undefined, undefined, undefined, undefined,
+      'Shopping', 'Buy eggs', undefined, undefined, undefined,
     );
   });
 
-  it('forwards metadata fields (priority, url)', async () => {
+  it('forwards priority metadata field', async () => {
     vi.mocked(addRemindersItem).mockResolvedValue(
-      okResult({ name: 'Task', priority: 'high', url: 'https://example.com' }),
+      okResult({ name: 'Task', priority: 'high' }),
     );
 
     await handleRemindersIpc(
@@ -316,7 +316,6 @@ describe('handleRemindersIpc - reminders_add_item', () => {
         listName: 'Work',
         title: 'Task',
         priority: 'high',
-        url: 'https://example.com',
       },
       SOURCE_GROUP,
       false,
@@ -324,7 +323,7 @@ describe('handleRemindersIpc - reminders_add_item', () => {
     );
 
     expect(addRemindersItem).toHaveBeenCalledWith(
-      'Work', 'Task', undefined, undefined, 'high', 'https://example.com',
+      'Work', 'Task', undefined, undefined, 'high',
     );
   });
 
@@ -390,11 +389,10 @@ describe('handleRemindersIpc - reminders_update_item', () => {
       newNotes: 'from farmers market',
       newDueDate: '2026-03-10',
       newPriority: undefined,
-      newUrl: undefined,
     });
   });
 
-  it('forwards metadata update fields (newPriority, newUrl)', async () => {
+  it('forwards newPriority metadata update field', async () => {
     vi.mocked(updateRemindersItem).mockResolvedValue(okResult({ name: 'Updated' }));
 
     await handleRemindersIpc(
@@ -404,7 +402,6 @@ describe('handleRemindersIpc - reminders_update_item', () => {
         listName: 'Shopping',
         itemTitle: 'Buy eggs',
         newPriority: 'low',
-        newUrl: 'https://example.com',
       },
       SOURCE_GROUP,
       false,
@@ -416,7 +413,6 @@ describe('handleRemindersIpc - reminders_update_item', () => {
       newNotes: undefined,
       newDueDate: undefined,
       newPriority: 'low',
-      newUrl: 'https://example.com',
     });
   });
 

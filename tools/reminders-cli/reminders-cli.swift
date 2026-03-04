@@ -5,8 +5,8 @@
 // Usage:
 //   reminders-cli list_lists
 //   reminders-cli list_items <list_name> [--include-completed]
-//   reminders-cli add_item <list_name> <title> [--notes <text>] [--due <ISO8601>] [--priority <none|low|medium|high>] [--url <string>]
-//   reminders-cli update_item <list_name> <title> [--new-title <t>] [--new-notes <n>] [--new-due <d>] [--new-priority <p>] [--new-url <u>]
+//   reminders-cli add_item <list_name> <title> [--notes <text>] [--due <ISO8601>] [--priority <none|low|medium|high>]
+//   reminders-cli update_item <list_name> <title> [--new-title <t>] [--new-notes <n>] [--new-due <d>] [--new-priority <p>]
 //   reminders-cli complete_item <list_name> <title>
 //   reminders-cli remove_item <list_name> <title>
 //   reminders-cli move_item <list_name> <title> <target_list>
@@ -111,7 +111,6 @@ func reminderToDict(_ r: EKReminder) -> [String: Any] {
         "notes": notes,
         "completed": r.isCompleted,
         "priority": priorityToString(r.priority),
-        "url": r.url?.absoluteString as Any? ?? NSNull(),
         "creationDate": dateToISO(r.creationDate),
         "completionDate": dateToISO(r.completionDate),
         "tags": extractTags(r.notes),
@@ -170,7 +169,7 @@ func listItems(listName: String, includeCompleted: Bool) {
     succeed("OK", data: items)
 }
 
-func addItem(listName: String, title: String, notes: String?, dueDate: String?, priority: String?, url: String?) {
+func addItem(listName: String, title: String, notes: String?, dueDate: String?, priority: String?) {
     guard let cal = findCalendar(listName) else { fail("List not found: \(listName)") }
     let reminder = EKReminder(eventStore: store)
     reminder.title = title
@@ -182,7 +181,6 @@ func addItem(listName: String, title: String, notes: String?, dueDate: String?, 
         )
     }
     if let p = priority { reminder.priority = stringToPriority(p) }
-    if let u = url { reminder.url = URL(string: u) }
     do {
         try store.save(reminder, commit: true)
         succeed("Added \"\(title)\" to \"\(listName)\"", data: reminderToDict(reminder))
@@ -191,7 +189,7 @@ func addItem(listName: String, title: String, notes: String?, dueDate: String?, 
     }
 }
 
-func updateItem(listName: String, title: String, newTitle: String?, newNotes: String?, newDueDate: String?, newPriority: String?, newUrl: String?) {
+func updateItem(listName: String, title: String, newTitle: String?, newNotes: String?, newDueDate: String?, newPriority: String?) {
     guard let cal = findCalendar(listName) else { fail("List not found: \(listName)") }
     guard let reminder = findReminder(inCalendar: cal, title: title) else { fail("Reminder not found: \(title)") }
 
@@ -203,7 +201,6 @@ func updateItem(listName: String, title: String, newTitle: String?, newNotes: St
         )
     }
     if let p = newPriority { reminder.priority = stringToPriority(p) }
-    if let u = newUrl { reminder.url = URL(string: u) }
     do {
         try store.save(reminder, commit: true)
         succeed("Updated \"\(reminder.title ?? title)\"", data: reminderToDict(reminder))
@@ -269,39 +266,35 @@ case "list_items":
     listItems(listName: args[1], includeCompleted: includeCompleted)
 
 case "add_item":
-    guard args.count >= 3 else { fail("Usage: add_item <list_name> <title> [--notes <text>] [--due <ISO8601>] [--priority <none|low|medium|high>] [--url <string>]") }
+    guard args.count >= 3 else { fail("Usage: add_item <list_name> <title> [--notes <text>] [--due <ISO8601>] [--priority <none|low|medium|high>]") }
     var notes: String?
     var dueDate: String?
     var priority: String?
-    var url: String?
     var i = 3
     while i < args.count {
         if args[i] == "--notes" && i + 1 < args.count { notes = args[i + 1]; i += 2 }
         else if args[i] == "--due" && i + 1 < args.count { dueDate = args[i + 1]; i += 2 }
         else if args[i] == "--priority" && i + 1 < args.count { priority = args[i + 1]; i += 2 }
-        else if args[i] == "--url" && i + 1 < args.count { url = args[i + 1]; i += 2 }
         else { i += 1 }
     }
-    addItem(listName: args[1], title: args[2], notes: notes, dueDate: dueDate, priority: priority, url: url)
+    addItem(listName: args[1], title: args[2], notes: notes, dueDate: dueDate, priority: priority)
 
 case "update_item":
-    guard args.count >= 3 else { fail("Usage: update_item <list_name> <title> [--new-title <t>] [--new-notes <n>] [--new-due <d>] [--new-priority <none|low|medium|high>] [--new-url <string>]") }
+    guard args.count >= 3 else { fail("Usage: update_item <list_name> <title> [--new-title <t>] [--new-notes <n>] [--new-due <d>] [--new-priority <none|low|medium|high>]") }
     var newTitle: String?
     var newNotes: String?
     var newDueDate: String?
     var newPriority: String?
-    var newUrl: String?
     var i = 3
     while i < args.count {
         if args[i] == "--new-title" && i + 1 < args.count { newTitle = args[i + 1]; i += 2 }
         else if args[i] == "--new-notes" && i + 1 < args.count { newNotes = args[i + 1]; i += 2 }
         else if args[i] == "--new-due" && i + 1 < args.count { newDueDate = args[i + 1]; i += 2 }
         else if args[i] == "--new-priority" && i + 1 < args.count { newPriority = args[i + 1]; i += 2 }
-        else if args[i] == "--new-url" && i + 1 < args.count { newUrl = args[i + 1]; i += 2 }
         else { i += 1 }
     }
-    if newTitle == nil && newNotes == nil && newDueDate == nil && newPriority == nil && newUrl == nil { fail("No update fields provided") }
-    updateItem(listName: args[1], title: args[2], newTitle: newTitle, newNotes: newNotes, newDueDate: newDueDate, newPriority: newPriority, newUrl: newUrl)
+    if newTitle == nil && newNotes == nil && newDueDate == nil && newPriority == nil { fail("No update fields provided") }
+    updateItem(listName: args[1], title: args[2], newTitle: newTitle, newNotes: newNotes, newDueDate: newDueDate, newPriority: newPriority)
 
 case "complete_item":
     guard args.count >= 3 else { fail("Usage: complete_item <list_name> <title>") }
