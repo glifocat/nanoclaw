@@ -62,6 +62,24 @@ export function computeNextRun(task: ScheduledTask): string | null {
   return null;
 }
 
+/** Prefix with current local date/time so the agent knows the day of week. */
+function datePrefix(): string {
+  const now = new Date();
+  const localDate = now.toLocaleDateString('en-US', {
+    timeZone: TIMEZONE,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const localTime = now.toLocaleTimeString('en-US', {
+    timeZone: TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `[Current date and time: ${localDate}, ${localTime}]\n\n`;
+}
+
 export interface SchedulerDependencies {
   registeredGroups: () => Record<string, RegisteredGroup>;
   getSessions: () => Record<string, string>;
@@ -172,7 +190,7 @@ async function runTask(
     const output = await runContainerAgent(
       group,
       {
-        prompt: task.prompt,
+        prompt: datePrefix() + task.prompt,
         sessionId,
         groupFolder: task.group_folder,
         chatJid: task.chat_jid,
