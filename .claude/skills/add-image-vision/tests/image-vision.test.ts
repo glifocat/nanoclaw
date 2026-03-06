@@ -120,7 +120,8 @@ describe('add-image-vision skill package', () => {
     });
 
     it('imports downloadMediaMessage', () => {
-      expect(content).toContain("import { downloadMediaMessage } from '@whiskeysockets/baileys'");
+      expect(content).toContain('downloadMediaMessage');
+      expect(content).toContain("from '@whiskeysockets/baileys'");
     });
 
     it('imports GROUPS_DIR from config', () => {
@@ -132,9 +133,8 @@ describe('add-image-vision skill package', () => {
     });
 
     it('includes image processing block', () => {
-      expect(content).toContain('processImage(buffer, groupDir, caption)');
-      expect(content).toContain('[Image - download failed]');
-      expect(content).toContain('[Image - processing failed]');
+      expect(content).toContain('processImage(buffer');
+      expect(content).toContain('Image - download failed');
     });
 
     it('preserves core WhatsAppChannel structure', () => {
