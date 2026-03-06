@@ -333,11 +333,11 @@ export async function processTaskIpc(
         if (!task) {
           logger.warn(
             { taskId: data.taskId, sourceGroup },
-            'Task not found for update',
+            'update_task: task not found',
           );
           break;
         }
-        if (!isMain && task.group_folder !== sourceGroup) {
+        if (!(isMain || task.group_folder === sourceGroup)) {
           logger.warn(
             { taskId: data.taskId, sourceGroup },
             'Unauthorized task update attempt',
@@ -346,46 +346,79 @@ export async function processTaskIpc(
         }
 
         const updates: Parameters<typeof updateTask>[1] = {};
-        if (data.prompt !== undefined) updates.prompt = data.prompt;
-        if (data.schedule_type !== undefined)
-          updates.schedule_type = data.schedule_type as
-            | 'cron'
-            | 'interval'
-            | 'once';
-        if (data.schedule_value !== undefined)
+
+        if (data.prompt !== undefined) {
+          updates.prompt = data.prompt;
+        }
+        if (data.context_mode === 'group' || data.context_mode === 'isolated') {
+          updates.context_mode = data.context_mode;
+        }
+
+        // If schedule changes, recalculate next_run
+        if (data.schedule_type && data.schedule_value) {
+          const newType = data.schedule_type as 'cron' | 'interval' | 'once';
+          updates.schedule_type = newType;
           updates.schedule_value = data.schedule_value;
 
-        // Recompute next_run if schedule changed
-        if (data.schedule_type || data.schedule_value) {
-          const updatedTask = {
-            ...task,
-            ...updates,
-          };
-          if (updatedTask.schedule_type === 'cron') {
+          let nextRun: string | null = null;
+          if (newType === 'cron') {
             try {
-              const interval = CronExpressionParser.parse(
-                updatedTask.schedule_value,
-                { tz: TIMEZONE },
-              );
-              updates.next_run = interval.next().toISOString();
+              const interval = CronExpressionParser.parse(data.schedule_value, {
+                tz: TIMEZONE,
+              });
+              nextRun = interval.next().toISOString();
             } catch {
               logger.warn(
-                { taskId: data.taskId, value: updatedTask.schedule_value },
-                'Invalid cron in task update',
+                {
+                  taskId: data.taskId,
+                  scheduleValue: data.schedule_value,
+                },
+                'update_task: invalid cron expression',
               );
               break;
             }
-          } else if (updatedTask.schedule_type === 'interval') {
-            const ms = parseInt(updatedTask.schedule_value, 10);
-            if (!isNaN(ms) && ms > 0) {
-              updates.next_run = new Date(Date.now() + ms).toISOString();
+          } else if (newType === 'interval') {
+            const ms = parseInt(data.schedule_value, 10);
+            if (isNaN(ms) || ms <= 0) {
+              logger.warn(
+                {
+                  taskId: data.taskId,
+                  scheduleValue: data.schedule_value,
+                },
+                'update_task: invalid interval',
+              );
+              break;
             }
+            nextRun = new Date(Date.now() + ms).toISOString();
+          } else if (newType === 'once') {
+            const scheduled = new Date(data.schedule_value);
+            if (isNaN(scheduled.getTime())) {
+              logger.warn(
+                {
+                  taskId: data.taskId,
+                  scheduleValue: data.schedule_value,
+                },
+                'update_task: invalid timestamp',
+              );
+              break;
+            }
+            nextRun = scheduled.toISOString();
+          }
+          updates.next_run = nextRun;
+
+          // Re-activate completed 'once' tasks that get a new schedule
+          if (task.status === 'completed') {
+            updates.status = 'active';
           }
         }
 
         updateTask(data.taskId, updates);
         logger.info(
-          { taskId: data.taskId, sourceGroup, updates },
+          {
+            taskId: data.taskId,
+            sourceGroup,
+            updatedFields: Object.keys(updates),
+          },
           'Task updated via IPC',
         );
       }
