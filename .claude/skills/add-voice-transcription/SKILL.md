@@ -1,11 +1,26 @@
 ---
 name: add-voice-transcription
-description: Add voice message transcription to NanoClaw using OpenAI's Whisper API. Automatically transcribes WhatsApp voice notes so the agent can read and respond to them.
+description: Add voice message transcription to NanoClaw using any OpenAI-compatible transcription endpoint (Parakeet, Whisper, Canary, etc.). Automatically transcribes WhatsApp voice notes so the agent can read and respond to them.
 ---
 
 # Add Voice Transcription
 
-This skill adds automatic voice message transcription to NanoClaw's WhatsApp channel using OpenAI's Whisper API. When a voice note arrives, it is downloaded, transcribed, and delivered to the agent as `[Voice: <transcript>]`.
+This skill adds automatic voice message transcription to NanoClaw's WhatsApp channel using any OpenAI-compatible `/v1/audio/transcriptions` endpoint. When a voice note arrives, it is downloaded, transcribed, and delivered to the agent as `[Voice: <transcript>]`.
+
+Works with Parakeet, Whisper (Speaches/faster-whisper-server), Canary, or any service exposing the OpenAI transcription API.
+
+## Prerequisites
+
+- `ffmpeg` must be installed (converts WhatsApp ogg/opus audio to WAV for endpoint compatibility)
+
+```bash
+# Linux
+sudo apt-get install -y ffmpeg
+# macOS
+brew install ffmpeg
+```
+
+Verify: `ffmpeg -version >/dev/null 2>&1 && echo "OK" || echo "MISSING"`
 
 ## Phase 1: Pre-flight
 
@@ -13,13 +28,19 @@ This skill adds automatic voice message transcription to NanoClaw's WhatsApp cha
 
 Read `.nanoclaw/state.yaml`. If `voice-transcription` is in `applied_skills`, skip to Phase 3 (Configure). The code changes are already in place.
 
+### Check ffmpeg is installed
+
+```bash
+ffmpeg -version >/dev/null 2>&1 && echo "FFMPEG_OK" || echo "FFMPEG_MISSING"
+```
+
+If missing, install it (see Prerequisites above).
+
 ### Ask the user
 
 Use `AskUserQuestion` to collect information:
 
-AskUserQuestion: Do you have an OpenAI API key for Whisper transcription?
-
-If yes, collect it now. If no, direct them to create one at https://platform.openai.com/api-keys.
+AskUserQuestion: What transcription endpoint will you use? I need the base URL (e.g., http://192.168.8.151:8301/v1) and the model name.
 
 ## Phase 2: Apply Code Changes
 
@@ -40,11 +61,11 @@ npx tsx scripts/apply-skill.ts .claude/skills/add-voice-transcription
 ```
 
 This deterministically:
-- Adds `src/transcription.ts` (voice transcription module using OpenAI Whisper)
+- Adds `src/transcription.ts` (voice transcription module using OpenAI-compatible API)
 - Three-way merges voice handling into `src/channels/whatsapp.ts` (isVoiceMessage check, transcribeAudioMessage call)
 - Three-way merges transcription tests into `src/channels/whatsapp.test.ts` (mock + 3 test cases)
 - Installs the `openai` npm dependency
-- Updates `.env.example` with `OPENAI_API_KEY`
+- Updates `.env.example` with `TRANSCRIPTION_BASE_URL`, `TRANSCRIPTION_API_KEY`, `TRANSCRIPTION_MODEL`
 - Records the application in `.nanoclaw/state.yaml`
 
 If the apply reports merge conflicts, read the intent files:
@@ -62,27 +83,28 @@ All tests must pass (including the 3 new voice transcription tests) and build mu
 
 ## Phase 3: Configure
 
-### Get OpenAI API key (if needed)
+### Collect endpoint details
 
-If the user doesn't have an API key:
+If not already provided in Phase 1, ask:
 
-> I need you to create an OpenAI API key:
->
-> 1. Go to https://platform.openai.com/api-keys
-> 2. Click "Create new secret key"
-> 3. Give it a name (e.g., "NanoClaw Transcription")
-> 4. Copy the key (starts with `sk-`)
->
-> Cost: ~$0.006 per minute of audio (~$0.003 per typical 30-second voice note)
-
-Wait for the user to provide the key.
+AskUserQuestion: I need your transcription endpoint details:
+1. Base URL (e.g., http://192.168.8.151:8301/v1)
+2. Model name (e.g., parakeet-tdt-0.6b-v3)
+3. Does it require an API key? (most self-hosted don't)
 
 ### Add to environment
 
-Add to `.env`:
+Append to `.env` using the values collected above:
 
 ```bash
-OPENAI_API_KEY=<their-key>
+# Voice transcription
+TRANSCRIPTION_BASE_URL=<base-url-from-user>
+TRANSCRIPTION_MODEL=<model-from-user>
+```
+
+If the endpoint requires an API key, also add:
+```bash
+TRANSCRIPTION_API_KEY=<key-from-user>
 ```
 
 Sync to container environment:
@@ -117,24 +139,53 @@ tail -f logs/nanoclaw.log | grep -i voice
 
 Look for:
 - `Transcribed voice message` — successful transcription with character count
-- `OPENAI_API_KEY not set` — key missing from `.env`
-- `OpenAI transcription failed` — API error (check key validity, billing)
+- `TRANSCRIPTION_BASE_URL not set` — base URL missing from `.env`
+- `Transcription failed` — API error (check endpoint is reachable, model name is correct)
 - `Failed to download audio message` — media download issue
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TRANSCRIPTION_BASE_URL` | *(required)* | Base URL of the transcription endpoint |
+| `TRANSCRIPTION_MODEL` | `whisper-1` | Model name the endpoint expects |
+| `TRANSCRIPTION_API_KEY` | `not-needed` | API key (only if endpoint requires auth) |
+
+### Example configurations
+
+**Parakeet TDT (recommended for Spanish):**
+```
+TRANSCRIPTION_BASE_URL=http://192.168.8.151:8301/v1
+TRANSCRIPTION_MODEL=parakeet-tdt-0.6b-v3
+```
+
+**Whisper via Speaches/faster-whisper-server:**
+```
+TRANSCRIPTION_BASE_URL=http://192.168.8.151:8300/v1
+TRANSCRIPTION_MODEL=Systran/faster-whisper-base
+```
+
+**OpenAI Whisper API:**
+```
+TRANSCRIPTION_BASE_URL=https://api.openai.com/v1
+TRANSCRIPTION_API_KEY=sk-...
+TRANSCRIPTION_MODEL=whisper-1
+```
 
 ## Troubleshooting
 
 ### Voice notes show "[Voice Message - transcription unavailable]"
 
-1. Check `OPENAI_API_KEY` is set in `.env` AND synced to `data/env/env`
-2. Verify key works: `curl -s https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY" | head -c 200`
-3. Check OpenAI billing — Whisper requires a funded account
+1. Check `TRANSCRIPTION_BASE_URL` is set in `.env` AND synced to `data/env/env`
+2. Verify endpoint is reachable: `curl -s http://192.168.8.151:8301/v1/models`
+3. Check the model name matches what the endpoint expects
 
 ### Voice notes show "[Voice Message - transcription failed]"
 
 Check logs for the specific error. Common causes:
-- Network timeout — transient, will work on next message
-- Invalid API key — regenerate at https://platform.openai.com/api-keys
-- Rate limiting — wait and retry
+- Network timeout — endpoint unreachable or slow
+- Wrong model name — check endpoint docs
+- Audio format not supported — most endpoints handle ogg/opus
 
 ### Agent doesn't respond to voice notes
 

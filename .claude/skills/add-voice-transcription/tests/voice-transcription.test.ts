@@ -13,7 +13,7 @@ describe('voice-transcription skill package', () => {
     expect(content).toContain('skill: voice-transcription');
     expect(content).toContain('version: 1.0.0');
     expect(content).toContain('openai');
-    expect(content).toContain('OPENAI_API_KEY');
+    expect(content).toContain('TRANSCRIPTION_BASE_URL');
   });
 
   it('has all files declared in adds', () => {
@@ -23,7 +23,7 @@ describe('voice-transcription skill package', () => {
     const content = fs.readFileSync(transcriptionFile, 'utf-8');
     expect(content).toContain('transcribeAudioMessage');
     expect(content).toContain('isVoiceMessage');
-    expect(content).toContain('transcribeWithOpenAI');
+    expect(content).toContain('transcribeAudio');
     expect(content).toContain('downloadMediaMessage');
     expect(content).toContain('readEnvFile');
   });
