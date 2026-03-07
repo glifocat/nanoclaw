@@ -9,11 +9,32 @@ This skill adds automatic voice message transcription to NanoClaw's WhatsApp cha
 
 Works with Parakeet, Whisper (Speaches/faster-whisper-server), Canary, or any service exposing the OpenAI transcription API.
 
+## Prerequisites
+
+- `ffmpeg` must be installed (converts WhatsApp ogg/opus audio to WAV for endpoint compatibility)
+
+```bash
+# Linux
+sudo apt-get install -y ffmpeg
+# macOS
+brew install ffmpeg
+```
+
+Verify: `ffmpeg -version >/dev/null 2>&1 && echo "OK" || echo "MISSING"`
+
 ## Phase 1: Pre-flight
 
 ### Check if already applied
 
 Read `.nanoclaw/state.yaml`. If `voice-transcription` is in `applied_skills`, skip to Phase 3 (Configure). The code changes are already in place.
+
+### Check ffmpeg is installed
+
+```bash
+ffmpeg -version >/dev/null 2>&1 && echo "FFMPEG_OK" || echo "FFMPEG_MISSING"
+```
+
+If missing, install it (see Prerequisites above).
 
 ### Ask the user
 
@@ -62,14 +83,28 @@ All tests must pass (including the 3 new voice transcription tests) and build mu
 
 ## Phase 3: Configure
 
+### Collect endpoint details
+
+If not already provided in Phase 1, ask:
+
+AskUserQuestion: I need your transcription endpoint details:
+1. Base URL (e.g., http://192.168.8.151:8301/v1)
+2. Model name (e.g., parakeet-tdt-0.6b-v3)
+3. Does it require an API key? (most self-hosted don't)
+
 ### Add to environment
 
-Add to `.env`:
+Append to `.env` using the values collected above:
 
 ```bash
-TRANSCRIPTION_BASE_URL=http://192.168.8.151:8301/v1
-TRANSCRIPTION_MODEL=parakeet-tdt-0.6b-v3
-# TRANSCRIPTION_API_KEY=not-needed  # only if the endpoint requires auth
+# Voice transcription
+TRANSCRIPTION_BASE_URL=<base-url-from-user>
+TRANSCRIPTION_MODEL=<model-from-user>
+```
+
+If the endpoint requires an API key, also add:
+```bash
+TRANSCRIPTION_API_KEY=<key-from-user>
 ```
 
 Sync to container environment:
