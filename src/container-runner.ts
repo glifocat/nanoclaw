@@ -26,6 +26,7 @@ import {
   stopContainer,
 } from './container-runtime.js';
 import { detectAuthMode } from './credential-proxy.js';
+import { readEnvFile } from './env.js';
 import { validateAdditionalMounts } from './mount-security.js';
 import { RegisteredGroup } from './types.js';
 
@@ -212,14 +213,43 @@ function buildVolumeMounts(
   return mounts;
 }
 
+/**
+ * Read the group's .mcp.json, extract all ${VAR} references, and resolve
+ * them from .env so the SDK can interpolate them inside the container.
+ */
+function readMcpEnvVars(groupDir: string): Record<string, string> {
+  const mcpPath = path.join(groupDir, '.mcp.json');
+  let content: string;
+  try {
+    content = fs.readFileSync(mcpPath, 'utf-8');
+  } catch {
+    return {};
+  }
+  // Extract all ${VAR} and ${VAR:-default} references
+  const varPattern = /\$\{([A-Z_][A-Z0-9_]*?)(?::-[^}]*)?\}/g;
+  const vars = new Set<string>();
+  let match;
+  while ((match = varPattern.exec(content)) !== null) {
+    vars.add(match[1]);
+  }
+  if (vars.size === 0) return {};
+  return readEnvFile([...vars]);
+}
+
 function buildContainerArgs(
   mounts: VolumeMount[],
   containerName: string,
+  mcpEnv: Record<string, string>,
 ): string[] {
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
+
+  // Pass MCP env vars so the SDK can interpolate ${VAR} in .mcp.json
+  for (const [key, value] of Object.entries(mcpEnv)) {
+    args.push('-e', `${key}=${value}`);
+  }
 
   // Route API traffic through the credential proxy (containers never see real secrets)
   args.push(
@@ -278,7 +308,8 @@ export async function runContainerAgent(
   const mounts = buildVolumeMounts(group, input.isMain);
   const safeName = group.folder.replace(/[^a-zA-Z0-9-]/g, '-');
   const containerName = `nanoclaw-${safeName}-${Date.now()}`;
-  const containerArgs = buildContainerArgs(mounts, containerName);
+  const mcpEnv = readMcpEnvVars(groupDir);
+  const containerArgs = buildContainerArgs(mounts, containerName, mcpEnv);
 
   logger.debug(
     {
