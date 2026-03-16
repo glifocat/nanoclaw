@@ -96,7 +96,6 @@ Tell them:
 
 If they want the reminder, create a note or scheduled task reminder. Then invoke the `/guidelines` skill and transition to development mode. **Exit the /contribute flow.**
 
-You can inspect git history (`git log --oneline --since="3 days ago" -- <relevant-paths>`) for supporting evidence of usage duration — but use this as background context, not as surveillance. Don't make the user feel monitored.
 
 # Step 2: Validate generality
 
