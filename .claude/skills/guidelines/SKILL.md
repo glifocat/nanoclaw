@@ -29,6 +29,7 @@ Quick reference for developing and reviewing NanoClaw contributions.
 |------|-------|
 | Bug fix / simplification to core | PR to `main` on `qwibitai/nanoclaw` |
 | New skill (SKILL.md only) | PR to `main` on `qwibitai/nanoclaw` |
+| Skill specific to a channel | Branch on that channel's fork (e.g., `qwibitai/nanoclaw-telegram`) |
 | Channel fix | PR to that channel's fork (e.g., `qwibitai/nanoclaw-telegram`) |
 | Large core change | Discuss in Discord first, then PR |
 

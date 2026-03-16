@@ -121,7 +121,8 @@ Use judgment based on the file paths AND the user's description — then confirm
 
 | Signal | Classification |
 |--------|---------------|
-| Changes only in `.claude/skills/` | New Skill |
+| Changes only in `.claude/skills/` (generic) | New Skill |
+| Skill relevant only to one channel (e.g., Telegram-only) | Channel Skill → branch on that channel's fork |
 | Changes only in `src/` — bug fix, security fix, simplification | Core Fix |
 | Changes in `src/channels/telegram*` or telegram-specific logic | Channel Fix (Telegram) |
 | Changes in `src/channels/discord*` | Channel Fix (Discord) |
