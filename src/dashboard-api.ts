@@ -49,10 +49,6 @@ function tryExecFileSync(cmd: string, args: string[]): string {
   }
 }
 
-function safeJson(res: Response, data: unknown): void {
-  res.json(data);
-}
-
 // ---------------------------------------------------------------------------
 // Endpoint handlers
 // ---------------------------------------------------------------------------
@@ -88,16 +84,14 @@ function handleStats(_req: Request, res: Response): void {
     // uptime in seconds
     let uptimeSeconds: number | null = null;
     try {
-      const out = execFileSync('sh', ['-c', 'cat /proc/uptime'], {
-        encoding: 'utf-8',
-      });
+      const out = fs.readFileSync('/proc/uptime', 'utf-8');
       uptimeSeconds = parseFloat(out.trim().split(' ')[0]);
     } catch {
       // /proc/uptime not available (macOS)
       uptimeSeconds = null;
     }
 
-    safeJson(res, {
+    res.json({
       groups: groupCount,
       activeTasks,
       totalMessages: totalMessages?.count ?? 0,
@@ -145,7 +139,7 @@ function handleGroups(_req: Request, res: Response): void {
       };
     });
 
-    safeJson(res, result);
+    res.json(result);
   } catch (err) {
     logger.error({ err }, 'dashboard /api/groups error');
     res.status(500).json({ error: 'Internal server error' });
@@ -160,7 +154,7 @@ function handleMessages(req: Request, res: Response): void {
       parseInt((req.query['limit'] as string) || '50', 10),
       500,
     );
-    const offset = parseInt((req.query['offset'] as string) || '0', 10);
+    const offset = Math.max(0, parseInt((req.query['offset'] as string) || '0', 10) || 0);
 
     let rows: unknown[];
     if (chatJid) {
@@ -181,7 +175,7 @@ function handleMessages(req: Request, res: Response): void {
         .all(limit, offset);
     }
 
-    safeJson(res, rows);
+    res.json(rows);
   } catch (err) {
     logger.error({ err }, 'dashboard /api/messages error');
     res.status(500).json({ error: 'Internal server error' });
@@ -204,7 +198,7 @@ function handleTasks(_req: Request, res: Response): void {
       return { ...task, recentRuns: logs };
     });
 
-    safeJson(res, result);
+    res.json(result);
   } catch (err) {
     logger.error({ err }, 'dashboard /api/tasks error');
     res.status(500).json({ error: 'Internal server error' });
@@ -274,7 +268,7 @@ function handleContainers(_req: Request, res: Response): void {
       // docker not available
     }
 
-    safeJson(res, containers);
+    res.json(containers);
   } catch (err) {
     logger.error({ err }, 'dashboard /api/containers error');
     res.status(500).json({ error: 'Internal server error' });
@@ -288,7 +282,7 @@ function handleChannels(_req: Request, res: Response): void {
       name: ch.name,
       isConnected: ch.isConnected(),
     }));
-    safeJson(res, result);
+    res.json(result);
   } catch (err) {
     logger.error({ err }, 'dashboard /api/channels error');
     res.status(500).json({ error: 'Internal server error' });
@@ -334,7 +328,7 @@ function handleSkills(_req: Request, res: Response): void {
       // .git directory doesn't exist (tarball/Docker deployment)
     }
 
-    safeJson(res, { local, remote });
+    res.json({ local, remote });
   } catch (err) {
     logger.error({ err }, 'dashboard /api/skills error');
     res.status(500).json({ error: 'Internal server error' });
@@ -351,7 +345,7 @@ function handleActivity(req: Request, res: Response): void {
     const logFile = path.join(process.cwd(), 'logs', 'nanoclaw.log');
 
     if (!fs.existsSync(logFile)) {
-      safeJson(res, []);
+      res.json([]);
       return;
     }
 
@@ -366,7 +360,7 @@ function handleActivity(req: Request, res: Response): void {
         .split('\n')
         .filter((l) => l.trim().length > 0);
     } catch {
-      safeJson(res, []);
+      res.json([]);
       return;
     }
 
@@ -381,7 +375,7 @@ function handleActivity(req: Request, res: Response): void {
       })
       .filter((e) => e !== null);
 
-    safeJson(res, events);
+    res.json(events);
   } catch (err) {
     logger.error({ err }, 'dashboard /api/activity error');
     res.status(500).json({ error: 'Internal server error' });
@@ -391,7 +385,7 @@ function handleActivity(req: Request, res: Response): void {
 /** GET /api/config */
 function handleConfig(_req: Request, res: Response): void {
   try {
-    safeJson(res, {
+    res.json({
       assistantName: ASSISTANT_NAME,
       containerTimeout: CONTAINER_TIMEOUT,
       idleTimeout: IDLE_TIMEOUT,

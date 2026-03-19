@@ -15,6 +15,7 @@ import {
 let db: Database.Database;
 
 export function getDb(): Database.Database {
+  if (!db) throw new Error('Database not initialized');
   return db;
 }
 
