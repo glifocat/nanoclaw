@@ -121,7 +121,8 @@ Use judgment based on the file paths AND the user's description — then confirm
 
 | Signal | Classification |
 |--------|---------------|
-| Changes only in `.claude/skills/` (generic) | New Skill |
+| Changes only in `.claude/skills/` (SKILL.md only, no code files) | New Skill (operational) |
+| Changes only in `.claude/skills/` (SKILL.md + code files in subdirs) | New Skill (utility) |
 | Skill relevant only to one channel (e.g., Telegram-only) | Channel Skill → branch on that channel's fork |
 | Changes only in `src/` — bug fix, security fix, simplification | Core Fix |
 | Changes in `src/channels/telegram*` or telegram-specific logic | Channel Fix (Telegram) |
@@ -195,17 +196,23 @@ Proceed to Step 7.
 
 ## Step 4b: SKILL.md validation
 
+NanoClaw has two kinds of skills that live in `.claude/skills/`:
+
+- **Operational skills** — instruction-only SKILL.md files. No code changes, just workflows (e.g., `/setup`, `/debug`).
+- **Utility skills** — self-contained tools that ship code files alongside the SKILL.md (e.g., in a `scripts/` subfolder). Use `${CLAUDE_SKILL_DIR}` to reference files. No branch merge needed.
+
 If the user already has a SKILL.md in `.claude/skills/<name>/SKILL.md`:
 - Read it and validate:
   - Contains YAML frontmatter with `name` and `description`
-  - Contains **instructions** for Claude to follow, not pre-built code
-  - Does not modify source files
   - Instructions are clear enough for someone else's Claude to follow
+  - For **operational** skills: contains instructions only, no code files, does not modify source files
+  - For **utility** skills: code lives in separate files alongside the SKILL.md (not inline), uses `${CLAUDE_SKILL_DIR}` for file references
 - If issues found, suggest improvements.
 
 If the user has source code changes that should become a skill:
-- Offer: "I can read your code changes and draft a SKILL.md that teaches Claude how to apply them. Want me to give it a shot?"
-- Create a SKILL.md with instructions that reference merging from a skill branch, matching the pattern of `/add-telegram` and `/add-discord`.
+- First determine the right skill type:
+  - If the feature needs to modify `src/`, `package.json`, or other core files → **feature skill** (branch-based). Offer: "I can read your code changes and draft a SKILL.md that teaches Claude how to apply them. Want me to give it a shot?" Create a SKILL.md with instructions that reference merging from a skill branch, matching the pattern of `/add-telegram` and `/add-discord`.
+  - If the feature is self-contained and doesn't modify source files → **utility skill**. Offer: "This looks like it could be a utility skill — a self-contained tool with its own code files. Want me to help package it that way?"
 
 ## Step 5b: Generality review
 
