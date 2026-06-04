@@ -1,0 +1,48 @@
+{
+  "name": "Spanish pharmacy reservation campaign",
+  "vapi": {
+    "phoneNumberId": "REPLACE_WITH_VAPI_PHONE_NUMBER_ID",
+    "assistantIdFile": ".vapi-assistant-id",
+    "assistantName": "NanoClaw Vapi Pharmacy Reservation es-ES",
+    "voice": {
+      "provider": "11labs",
+      "voiceId": "REPLACE_WITH_ELEVENLABS_VOICE_ID",
+      "model": "eleven_turbo_v2_5",
+      "language": "es"
+    },
+    "fallbackVoice": {
+      "provider": "azure",
+      "voiceId": "es-ES-AlvaroNeural"
+    },
+    "model": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "temperature": 0.3
+    },
+    "transcriber": {
+      "provider": "deepgram",
+      "model": "nova-2",
+      "language": "es"
+    },
+    "silenceTimeoutSeconds": 35,
+    "maxDurationSeconds": 240
+  },
+  "client": {
+    "name": "REPLACE_WITH_RESERVATION_NAME",
+    "callbackPhone": "+34XXXXXXXXX"
+  },
+  "item": {
+    "presentationNatural": "Daktarin gel oral, 20 miligramos por gramo",
+    "pronunciationHint": "Dak-tarin, con K dura, no con C",
+    "activePrinciple": "miconazol",
+    "strength": "20 mg/g",
+    "format": "gel oral",
+    "units": 1,
+    "prescription": "no_prescription_required"
+  },
+  "behavior": {
+    "stopOnReservation": true,
+    "retryNoAnswer": 0,
+    "secondsBetweenCalls": 2
+  }
+}
