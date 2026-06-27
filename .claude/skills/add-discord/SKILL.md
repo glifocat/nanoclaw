@@ -11,16 +11,16 @@ Adds Discord bot support via the Chat SDK bridge.
 
 NanoClaw doesn't ship channels in trunk. This skill copies the Discord adapter in from the `channels` branch.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/discord.ts` exists
 - `src/channels/discord-registration.test.ts` exists
 - `src/channels/index.ts` contains `import './discord.js';`
 - `@chat-adapter/discord` is listed in `package.json` dependencies
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to `src/channels/discord.ts`, note that step 2 overwrites the file from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -59,6 +59,8 @@ pnpm exec vitest run src/channels/discord-registration.test.ts
 Both must be clean before proceeding. `discord-registration.test.ts` is the one integration test: it imports the real channel barrel and asserts the registry contains `discord`. It goes red if the `import './discord.js';` line is deleted or drifts, if the barrel fails to evaluate, or if `@chat-adapter/discord` isn't installed (the import throws) — so it also implicitly verifies the dependency from step 4. The adapter also calls core's `createChatSdkBridge(...)`; that typed core-API consumption is guarded by `pnpm run build`.
 
 ## Credentials
+
+If `.env` already contains `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, and `DISCORD_PUBLIC_KEY`, the channel is already configured — skip to **Next Steps**. Otherwise, walk through the steps below.
 
 ### Create Discord Bot
 

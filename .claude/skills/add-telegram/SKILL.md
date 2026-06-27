@@ -11,9 +11,9 @@ Adds Telegram bot support via the Chat SDK bridge.
 
 NanoClaw doesn't ship channels in trunk. This skill copies the Telegram adapter, its formatting/pairing helpers, their tests, and the `pair-telegram` setup step in from the `channels` branch.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/telegram.ts`, `telegram-pairing.ts`, `telegram-markdown-sanitize.ts` (and their `.test.ts` siblings) all exist
 - `src/channels/telegram-registration.test.ts` exists
@@ -21,7 +21,7 @@ Skip to **Credentials** if all of these are already in place:
 - `setup/pair-telegram.ts` exists and `setup/index.ts`'s `STEPS` map contains `'pair-telegram':`
 - `@chat-adapter/telegram` is listed in `package.json` dependencies
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to the files written by this skill (`src/channels/telegram*.ts`, `setup/pair-telegram.ts`), note that step 2 overwrites them from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -75,6 +75,8 @@ Both must be clean before proceeding. `telegram-registration.test.ts` is the one
 End-to-end message delivery against a real Telegram bot is verified manually once the service is running — see Next Steps and the pairing flow in Channel Info.
 
 ## Credentials
+
+If `.env` already contains `TELEGRAM_BOT_TOKEN`, the channel is already configured — skip to **Next Steps**. Otherwise, walk through the steps below.
 
 ### Create Telegram Bot
 

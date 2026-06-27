@@ -11,9 +11,9 @@ Trunk ships with only the `claude` provider baked in. This skill copies the Open
 
 ## Install
 
-### Pre-flight
+### Pre-flight (diagnostics)
 
-If all of the following are already present, skip to **Configuration**:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/providers/opencode.ts`
 - `container/agent-runner/src/providers/opencode.ts`
@@ -25,7 +25,7 @@ If all of the following are already present, skip to **Configuration**:
 - `ARG OPENCODE_VERSION` and `"opencode-ai@${OPENCODE_VERSION}"` in `container/Dockerfile`
 - `src/opencode-dockerfile.test.ts` (the Dockerfile install guard)
 
-Missing pieces — continue below. All steps are idempotent; re-running is safe.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to the files written by this skill (provider sources under `src/providers/` and `container/agent-runner/src/providers/`, plus the `ARG`/`RUN` blocks in `container/Dockerfile`), note that step 2 and step 5 overwrite them from `origin/providers`.
 
 ### 1. Fetch the providers branch
 
@@ -143,6 +143,8 @@ done
 ```
 
 ## Configuration
+
+If `.env` already contains `OPENCODE_PROVIDER` and `OPENCODE_MODEL` (and the matching provider key is registered in OneCLI), the provider is already configured — skip to **Operational notes**. Otherwise, walk through the host `.env` and per-group settings below.
 
 ### Host `.env` (typical)
 

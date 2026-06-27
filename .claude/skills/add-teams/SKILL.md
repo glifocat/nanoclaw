@@ -11,16 +11,16 @@ Connect NanoClaw to Microsoft Teams for interactive chat in team channels, group
 
 NanoClaw doesn't ship channels in trunk. This skill copies the Teams adapter in from the `channels` branch.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/teams.ts` exists
 - `src/channels/teams-registration.test.ts` exists
 - `src/channels/index.ts` contains `import './teams.js';`
 - `@chat-adapter/teams` is listed in `package.json` dependencies
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to `src/channels/teams.ts`, note that step 2 overwrites the file from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -62,7 +62,9 @@ End-to-end message delivery against a real Teams workspace is verified manually 
 
 ## Credentials
 
-Two paths — manual (Azure Portal) or auto (Teams CLI).
+If `.env` already contains `TEAMS_APP_ID` and `TEAMS_APP_PASSWORD`, the Azure App and bot registration are already in place — skip to **Next Steps**. Re-running the **Auto: Teams CLI** path below will register a *new* Azure App and Bot (`teams app create`), creating duplicate resources in your tenant.
+
+Otherwise, walk through one of the two paths below — manual (Azure Portal) or auto (Teams CLI).
 
 ### Auto: Teams CLI
 

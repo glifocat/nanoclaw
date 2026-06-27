@@ -11,9 +11,9 @@ Adds WhatsApp support via the native Baileys adapter (no Chat SDK bridge).
 
 NanoClaw doesn't ship channels in trunk. This skill copies the native WhatsApp (Baileys) adapter and its `whatsapp-auth` setup step in from the `channels` branch. No Chat SDK bridge.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent. Credentials gate themselves separately on `store/auth/creds.json`, so re-running install never re-authenticates.
 
 - `src/channels/whatsapp.ts` exists
 - `src/channels/whatsapp-registration.test.ts` exists
@@ -24,7 +24,7 @@ Skip to **Credentials** if all of these are already in place:
 - `@whiskeysockets/baileys`, `qrcode`, `pino` are listed in `package.json` dependencies
 - `.claude/skills/add-whatsapp/scripts/wa-qr-browser.ts` exists (ships with this skill)
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to the files written by this skill (`src/channels/whatsapp*.ts`, `setup/whatsapp-auth.ts`, `setup/groups.ts`), note that step 2 overwrites them from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
