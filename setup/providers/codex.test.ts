@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock child_process so runCodexLoginAuth never spawns a real codex CLI; the
 // spawn stand-in plays `codex login` writing auth.json into whatever
@@ -21,6 +21,10 @@ vi.mock('child_process', () => ({
 vi.mock('../logs.js', () => ({ step: vi.fn(), userInput: vi.fn() }));
 
 import { buildCodexFailurePrompt, runCodexLoginAuth, verifyCodexInstall } from './codex.js';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 // Structural guard for the codex payload wiring: provider files, both barrel
 // imports, and the pinned Dockerfile install. Goes red if any of them is
@@ -97,5 +101,38 @@ describe('runCodexLoginAuth', () => {
 
     // The isolated dir holds a live credential — gone once vaulted.
     expect(fs.existsSync(codexHome!)).toBe(false);
+  });
+
+  it('updates an existing vault secret when reconnecting', async () => {
+    mockSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+    mockExecFileSync.mockReturnValue('');
+
+    let loginEnv: NodeJS.ProcessEnv | undefined;
+    mockSpawn.mockImplementation((...args: unknown[]) => {
+      const opts = args[2] as { env?: NodeJS.ProcessEnv };
+      loginEnv = opts.env;
+      fs.writeFileSync(path.join(opts.env!.CODEX_HOME!, 'auth.json'), '{"tokens":{"access":"fresh"}}');
+      const child = new EventEmitter();
+      setImmediate(() => child.emit('close', 0));
+      return child;
+    });
+
+    await runCodexLoginAuth('browser', {
+      id: 'secret-123',
+      name: 'OpenAI',
+      type: 'openai',
+      hostPattern: 'chatgpt.com',
+    });
+
+    const vaultCall = mockExecFileSync.mock.calls.find((c) => {
+      const args = c[1] as string[];
+      return c[0] === 'onecli' && args[0] === 'secrets' && args[1] === 'update';
+    });
+    expect(vaultCall).toBeDefined();
+    const vaultArgs = vaultCall![1] as string[];
+    expect(vaultArgs).toContain('--id');
+    expect(vaultArgs[vaultArgs.indexOf('--id') + 1]).toBe('secret-123');
+    expect(vaultArgs[vaultArgs.indexOf('--value') + 1]).toBe('{"tokens":{"access":"fresh"}}');
+    expect(fs.existsSync(loginEnv!.CODEX_HOME!)).toBe(false);
   });
 });
