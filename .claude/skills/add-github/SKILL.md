@@ -15,16 +15,16 @@ You need a **dedicated GitHub bot account** (not your personal account). The ada
 
 NanoClaw doesn't ship channels in trunk. This skill copies the GitHub adapter in from the `channels` branch.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/github.ts` exists
 - `src/channels/github-registration.test.ts` exists
 - `src/channels/index.ts` contains `import './github.js';`
 - `@chat-adapter/github` is listed in `package.json` dependencies
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to `src/channels/github.ts`, note that step 2 overwrites the file from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -65,6 +65,8 @@ Both must be clean before proceeding. `github-registration.test.ts` is the one i
 End-to-end message delivery against a real GitHub repo is verified manually once the service is running — see Next Steps and the webhook setup above.
 
 ## Credentials
+
+If `.env` already contains `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET`, and `GITHUB_BOT_USERNAME`, the channel is already configured — skip to **Wiring**. Otherwise, walk through the steps below.
 
 ### 1. Create a Personal Access Token for the bot account
 

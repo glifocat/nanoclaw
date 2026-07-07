@@ -24,16 +24,16 @@ Adds Linear support via the Chat SDK bridge. The agent participates in issue com
 
 NanoClaw doesn't ship channels in trunk. This skill copies the Linear adapter in from the `channels` branch and wires it into the channel registry. Linear OAuth apps post and read comments under an app identity that can't be @-mentioned, so when you wire the channel in `/manage-channels`, pick an engage mode that responds to plain comments rather than mention-only.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/linear.ts` exists
 - `src/channels/linear-registration.test.ts` exists
 - `src/channels/index.ts` contains `import './linear.js';`
 - `@chat-adapter/linear` is listed in `package.json` dependencies
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to `src/channels/linear.ts`, note that step 2 overwrites the file from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -74,6 +74,8 @@ Both must be clean before proceeding. `linear-registration.test.ts` is the one i
 End-to-end message delivery against a real Linear workspace is verified manually once the service is running — see Wiring and Next Steps.
 
 ## Credentials
+
+If `.env` already contains `LINEAR_WEBHOOK_SECRET` and `LINEAR_TEAM_KEY`, the channel is already configured — skip to **Wiring**. Otherwise, walk through the steps below.
 
 ### 1. Set up a webhook
 

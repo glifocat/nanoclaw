@@ -19,9 +19,9 @@ Adds Emacs support via a local HTTP bridge. Works with Doom Emacs, Spacemacs, an
 
 NanoClaw doesn't ship channels in trunk. This skill copies the Emacs adapter and the Lisp client in from the `channels` branch. Native HTTP bridge — no Chat SDK, no adapter package.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Enable** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/emacs.ts` exists
 - `src/channels/emacs.test.ts` exists
@@ -29,7 +29,7 @@ Skip to **Enable** if all of these are already in place:
 - `emacs/nanoclaw.el` exists
 - `src/channels/index.ts` contains `import './emacs.js';`
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to the files written by this skill (`src/channels/emacs*.ts`, `emacs/nanoclaw.el`), note that step 2 overwrites them from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -67,6 +67,8 @@ Both must be clean before proceeding. `emacs-registration.test.ts` is the one in
 End-to-end message delivery from a real Emacs buffer is verified manually once the service is running — see Verify and Troubleshooting.
 
 ## Enable
+
+If `.env` already contains `EMACS_ENABLED=true`, the channel is already enabled — skip to **Wire the channel**. Otherwise, walk through the steps below.
 
 The adapter is gated by `EMACS_ENABLED` so the HTTP port isn't opened on hosts that aren't running Emacs. Add to `.env`:
 

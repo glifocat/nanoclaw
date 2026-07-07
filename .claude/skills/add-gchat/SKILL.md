@@ -11,16 +11,16 @@ Adds Google Chat support via the Chat SDK bridge.
 
 NanoClaw doesn't ship channels in trunk. This skill copies the Google Chat adapter in from the `channels` branch.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/gchat.ts` exists
 - `src/channels/gchat-registration.test.ts` exists
 - `src/channels/index.ts` contains `import './gchat.js';`
 - `@chat-adapter/gchat` is listed in `package.json` dependencies
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to `src/channels/gchat.ts`, note that step 2 overwrites the file from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -61,6 +61,8 @@ Both must be clean before proceeding. `gchat-registration.test.ts` is the one in
 End-to-end message delivery against a real Google Chat space is verified manually once the service is running — see Next Steps and the webhook setup above.
 
 ## Credentials
+
+If `.env` already contains `GCHAT_CREDENTIALS`, the channel is already configured — skip to **Next Steps**. Otherwise, walk through the steps below.
 
 > 1. Go to [Google Cloud Console](https://console.cloud.google.com)
 > 2. Create or select a project

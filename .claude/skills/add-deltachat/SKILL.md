@@ -9,16 +9,16 @@ The adapter drives the `@deltachat/stdio-rpc-server` JSON-RPC subprocess directl
 
 ## Install
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/deltachat.ts` exists
 - `src/channels/deltachat-registration.test.ts` exists
 - `src/channels/index.ts` contains `import './deltachat.js';`
 - `@deltachat/stdio-rpc-server` is listed in `package.json` dependencies
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to `src/channels/deltachat.ts`, note that step 2 overwrites the file from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -73,6 +73,8 @@ node -e "require('dns').resolveMx('example.com', (e,r) => console.log(r))"
 Most providers publish their IMAP/SMTP hostnames in their help docs under "manual setup" or "IMAP access."
 
 ## Credentials
+
+If `.env` already contains `DC_EMAIL` and `DC_PASSWORD`, the account is already configured — skip to **Wiring**. Otherwise, walk through the steps below.
 
 Add to `.env`:
 

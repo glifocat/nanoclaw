@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 const SKILLS_ROOT = join(__dirname, '..', '.claude', 'skills');
 
-type GateSection = 'Credentials' | 'Configuration';
+type GateSection = 'Credentials' | 'Configuration' | 'Enable';
 
 interface SkillCase {
   name: string;
@@ -28,6 +28,26 @@ const CASES: SkillCase[] = [
   { name: 'add-teams', gateSection: 'Credentials', gateVars: ['TEAMS_APP_ID', 'TEAMS_APP_PASSWORD'] },
   { name: 'add-whatsapp', gateSection: 'Credentials', gateVars: ['store/auth/creds.json'] },
   { name: 'add-opencode', gateSection: 'Configuration', gateVars: ['OPENCODE_PROVIDER', 'OPENCODE_MODEL'] },
+  { name: 'add-deltachat', gateSection: 'Credentials', gateVars: ['DC_EMAIL', 'DC_PASSWORD'] },
+  { name: 'add-emacs', gateSection: 'Enable', gateVars: ['EMACS_ENABLED'] },
+  { name: 'add-gchat', gateSection: 'Credentials', gateVars: ['GCHAT_CREDENTIALS'] },
+  {
+    name: 'add-github',
+    gateSection: 'Credentials',
+    gateVars: ['GITHUB_TOKEN', 'GITHUB_WEBHOOK_SECRET', 'GITHUB_BOT_USERNAME'],
+  },
+  { name: 'add-imessage', gateSection: 'Credentials', gateVars: ['IMESSAGE_LOCAL'] },
+  { name: 'add-linear', gateSection: 'Credentials', gateVars: ['LINEAR_WEBHOOK_SECRET', 'LINEAR_TEAM_KEY'] },
+  { name: 'add-matrix', gateSection: 'Credentials', gateVars: ['MATRIX_BASE_URL', 'MATRIX_USER_ID'] },
+  { name: 'add-resend', gateSection: 'Credentials', gateVars: ['RESEND_API_KEY', 'RESEND_WEBHOOK_SECRET'] },
+  { name: 'add-signal', gateSection: 'Credentials', gateVars: ['SIGNAL_ACCOUNT'] },
+  { name: 'add-webex', gateSection: 'Credentials', gateVars: ['WEBEX_BOT_TOKEN', 'WEBEX_WEBHOOK_SECRET'] },
+  { name: 'add-wechat', gateSection: 'Credentials', gateVars: ['WECHAT_ENABLED'] },
+  {
+    name: 'add-whatsapp-cloud',
+    gateSection: 'Credentials',
+    gateVars: ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN'],
+  },
 ];
 
 function readSkill(name: string): string {

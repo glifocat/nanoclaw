@@ -119,16 +119,16 @@ This prints a `tsdevice:` URI. Scan it as a QR code on your phone: **Settings �
 
 ## Install
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/signal.ts` exists
 - `src/channels/signal.test.ts` exists
 - `src/channels/signal-registration.test.ts` exists
 - `src/channels/index.ts` contains `import './signal.js';`
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to `src/channels/signal.ts`, note that step 2 overwrites the file from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -162,6 +162,8 @@ pnpm exec vitest run src/channels/signal-registration.test.ts
 Both must be clean before proceeding. `signal-registration.test.ts` is the one integration test: it imports the real channel barrel and asserts the registry contains `signal`. It goes red if the `import './signal.js';` line is deleted or drifts, or if the barrel fails to evaluate (so the channel genuinely would not register). The adapter consumes only Node.js builtins, so there is no npm dependency to guard for this channel. The adapter's typed core-API consumption is guarded by `pnpm run build`.
 
 ## Credentials
+
+If `.env` already contains `SIGNAL_ACCOUNT`, the channel is already configured — skip to **Wiring**. Otherwise, walk through the steps below.
 
 Add to `.env`:
 

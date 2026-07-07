@@ -24,16 +24,16 @@ Adds WeChat support via **iLink Bot API** — the first-party Tencent API for pe
 
 NanoClaw doesn't ship channels in trunk. This skill copies the WeChat adapter in from the `channels` branch.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/wechat.ts` exists
 - `src/channels/wechat-registration.test.ts` exists
 - `src/channels/index.ts` contains `import './wechat.js';`
 - `wechat-ilink-client` is listed in `package.json` dependencies
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to `src/channels/wechat.ts`, note that step 2 overwrites the file from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -74,6 +74,8 @@ Both must be clean before proceeding. `wechat-registration.test.ts` is the one i
 End-to-end message delivery against a real WeChat account is verified manually once the service is running — see Credentials and Wire your first DM above.
 
 ## Credentials
+
+If `.env` already contains `WECHAT_ENABLED=true`, the channel is already enabled — skip to **Wire your first DM**. Otherwise, walk through the steps below.
 
 Unlike most channels, WeChat requires **no pre-configured API keys**. Auth happens via QR code scan from your phone.
 

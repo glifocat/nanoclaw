@@ -11,16 +11,16 @@ Adds Matrix support via the Chat SDK bridge.
 
 NanoClaw doesn't ship channels in trunk. This skill copies the Matrix adapter in from the `channels` branch.
 
-### Pre-flight (idempotent)
+### Pre-flight (diagnostics)
 
-Skip to **Credentials** if all of these are already in place:
+These markers indicate a prior install. They are diagnostic only, not a skip gate — the install steps below always run, and each is individually idempotent.
 
 - `src/channels/matrix.ts` exists
 - `src/channels/matrix-registration.test.ts` exists
 - `src/channels/index.ts` contains `import './matrix.js';`
 - `@beeper/chat-adapter-matrix` is listed in `package.json` dependencies
 
-Otherwise continue. Every step below is safe to re-run.
+> These steps run unconditionally on every invocation; all are individually idempotent. If you carry local patches to `src/channels/matrix.ts`, note that step 2 overwrites the file from `origin/channels`.
 
 ### 1. Fetch the channels branch
 
@@ -83,6 +83,8 @@ Both must be clean before proceeding. `matrix-registration.test.ts` is the one i
 End-to-end message delivery against a real Matrix homeserver is verified manually once the service is running — see Next Steps.
 
 ## Credentials
+
+If `.env` already contains `MATRIX_BASE_URL` and `MATRIX_USER_ID`, the bot account is already configured — skip to **Next Steps**. Otherwise, walk through the steps below.
 
 The bot needs its own Matrix account — separate from the user's account. This is required because Matrix cannot send DMs to yourself.
 
