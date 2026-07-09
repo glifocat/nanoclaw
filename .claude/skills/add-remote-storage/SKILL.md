@@ -191,10 +191,19 @@ If `EXIT:0`, continue. Otherwise suggest checking credentials/URL and retry.
 
 ### Step 7: Create the Host Mount (systemd)
 
-Create the mount point and install a systemd service:
+The mount runs as the **operator's own user**, not root. rclone holds the remote's credentials for the lifetime of the mount, and the agent container runs as the host user's uid — so a root-owned mount presents every file as `root` to the agent. Mounting as the operator keeps both sides on the same uid and keeps the credentials out of a root process.
+
+Resolve the operator's identity and substitute it into `{user}` / `{group}` / `{home}`:
+
+```bash
+id -un; id -gn; echo $HOME
+```
+
+Create the mount point and install the service. The `chown` is required: `fusermount` refuses to mount unless the mounting user owns the mount point.
 
 ```bash
 sudo mkdir -p /mnt/nanoclaw/{name}
+sudo chown {user}:{group} /mnt/nanoclaw/{name}
 
 sudo tee /etc/systemd/system/nanoclaw-mount-{name}.service > /dev/null <<EOF
 [Unit]
@@ -206,8 +215,12 @@ StartLimitBurst=5
 
 [Service]
 Type=notify
+SuccessExitStatus=143
+User={user}
+Group={group}
 ExecStart=/usr/bin/rclone mount nanoclaw-{name}:{remotePath} /mnt/nanoclaw/{name} \
   --config {home}/.config/rclone/rclone.conf \
+  --cache-dir {home}/.cache/rclone \
   --vfs-cache-mode full \
   --vfs-cache-max-age 1h \
   --allow-other \
@@ -224,15 +237,22 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now nanoclaw-mount-{name}.service
 ```
 
-`{home}` is the operator's home directory (`echo $HOME`) — the config path must be absolute because the unit runs as root. The unit is backend-agnostic: `--vfs-cache-mode full` is required for random-access writes on S3-style object stores and already covers WebDAV.
+Why each non-obvious directive is there:
 
-Verify:
+- **`User=` / `Group=`** — see above. `--allow-other` still applies and is what lets the container runtime (which resolves bind mounts as root) traverse the FUSE mount. Without it, container spawns fail even though the operator can list the mount fine.
+- **`SuccessExitStatus=143`** — rclone traps `SIGTERM`, logs `Exiting...`, and exits `143` (`128+15`). systemd would otherwise record every clean stop as `Failed with result 'exit-code'`. Cosmetic, but it makes a genuinely failing mount hard to spot in `journalctl`.
+- **`--config` / `--cache-dir`** — absolute, so the paths cannot drift. systemd populates `$HOME` when `User=` is set, so rclone would find both by itself; pinning them means a future `Environment=` or a pre-v240 systemd can't silently relocate the cache. (A unit with *no* `User=` runs as root with `$HOME` unset, and rclone falls back to `$TMPDIR/rclone` — the reason root-era mounts leave a stray `/tmp/rclone`.)
+- **`--vfs-cache-mode full`** — required for random-access writes on S3-style object stores, and already covers WebDAV. The unit is otherwise backend-agnostic.
+
+Verify — the mount must report the operator's uid, not `0`:
 
 ```bash
-systemctl is-active nanoclaw-mount-{name}.service && ls /mnt/nanoclaw/{name}
+systemctl is-active nanoclaw-mount-{name}.service
+mount | grep /mnt/nanoclaw/{name}      # expect user_id=<operator uid>,allow_other
+ls /mnt/nanoclaw/{name}
 ```
 
-If the service fails to start, check `journalctl -u nanoclaw-mount-{name}.service -n 20` — the usual causes are bad credentials (redo Step 6) or a missing `user_allow_other` (redo Step 5).
+If the service fails to start, check `journalctl -u nanoclaw-mount-{name}.service -n 20` — the usual causes are bad credentials (redo Step 6), a missing `user_allow_other` (redo Step 5), or a mount point still owned by `root` (redo the `chown` above).
 
 ### Step 8: Add to the Mount Allowlist
 
@@ -348,6 +368,14 @@ Then restart the mount:
 sudo systemctl restart nanoclaw-mount-{name}.service
 ```
 
+⚠️ Restarting a mount invalidates the FUSE handle that **already-running containers** hold through their bind mount — they keep a stale reference rather than picking up the new one. After any restart, kill the containers of every group assigned to this mount so they respawn against the fresh mount:
+
+```bash
+docker ps --format '{{.Names}}' | grep '^nanoclaw-v2-<group-folder>-'   # then: docker kill <name>
+```
+
+The same applies to `REMOVE.md` teardown and to changing `User=` on an existing unit.
+
 ### Remove a mount
 
 Follow [REMOVE.md](REMOVE.md).
@@ -358,7 +386,8 @@ What is and isn't encrypted with this setup — share these facts when the opera
 
 - **In transit:** encrypted whenever the endpoint is HTTPS (Step 2 enforces this unless the operator explicitly accepts an HTTP endpoint on a trusted network).
 - **At rest on the remote:** whatever the provider does — S3 providers typically encrypt server-side; Nextcloud server-side encryption is an optional admin feature. In all cases the storage provider can read the content.
-- **On this host:** two places hold unencrypted data. The VFS cache (`--vfs-cache-mode full`) keeps plaintext copies of recently accessed files under root's rclone cache directory for up to `--vfs-cache-max-age`. And `~/.config/rclone/rclone.conf` stores credentials *obscured, not encrypted* — rclone's obscuring is reversible, so treat file permissions (0600) and least-privilege credentials as the real protection. rclone's config-file encryption exists but requires a password at mount time, which breaks unattended boot mounts — do not enable it for mounts managed by this skill.
+- **On this host:** two places hold unencrypted data. The VFS cache (`--vfs-cache-mode full`) keeps plaintext copies of recently accessed files under the operator's rclone cache directory (`{home}/.cache/rclone`, pinned by `--cache-dir` in Step 7) for up to `--vfs-cache-max-age`. And `~/.config/rclone/rclone.conf` stores credentials *obscured, not encrypted* — rclone's obscuring is reversible, so treat file permissions (0600) and least-privilege credentials as the real protection. rclone's config-file encryption exists but requires a password at mount time, which breaks unattended boot mounts — do not enable it for mounts managed by this skill.
+- **The mount itself is not permission-checked.** rclone mounts without `default_permissions`, so the kernel does not enforce the ownership and mode bits it displays — with `--allow-other`, any local user can read and write the mount regardless of what `ls -l` shows. The mount's uid governs what the *remote* sees, not who may touch it locally. If the host has untrusted local users, add `--default-permissions` to `ExecStart` (and confirm the agent uid still has the access it needs).
 
 **End-to-end encryption (advanced):** to keep the provider from ever seeing plaintext, wrap the remote in rclone's `crypt` backend: in `rclone config` (operator's terminal, as in Step 6) create the base remote as `nanoclaw-{name}-base`, then a second remote `nanoclaw-{name}` of type `crypt` with `remote = nanoclaw-{name}-base:{remotePath}` — the remote path is baked into the crypt remote. Because of that, one substitution applies everywhere: any command that references `nanoclaw-{name}:{remotePath}` (the Step 6 verification, the Step 7 unit's `ExecStart`, connectivity tests) uses `nanoclaw-{name}:` instead — appending `{remotePath}` again would apply the path twice. The allowlist and group-assignment steps are unaffected. Two caveats to state: the crypt keys live in the same rclone.conf, so this protects against the provider, not against host compromise; and remotely stored data is only readable through rclone with those keys (the provider's own web UI shows ciphertext). Note that Nextcloud's built-in end-to-end-encrypted folders are not accessible over WebDAV at all — `crypt` is the way to get E2E with this skill.
 

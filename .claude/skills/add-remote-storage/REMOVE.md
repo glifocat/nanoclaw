@@ -29,16 +29,31 @@ pnpm exec tsx setup/index.ts --step mounts --force -- --empty
 
 ## 3. Stop and remove the systemd unit
 
+Before stopping, check the VFS cache for writes that have not reached the remote — stopping with dirty data queued loses those uploads:
+
+```bash
+grep -rl '"Dirty": *true' {home}/.cache/rclone/vfsMeta/nanoclaw-{name} 2>/dev/null | wc -l   # expect 0
+```
+
+If non-zero, leave the mount up until rclone flushes (watch `journalctl -u nanoclaw-mount-{name}.service -f` for `vfs cache: cleaned`).
+
 ```bash
 sudo systemctl disable --now nanoclaw-mount-{name}.service
 sudo rm /etc/systemd/system/nanoclaw-mount-{name}.service
 sudo systemctl daemon-reload
 ```
 
-## 4. Remove the mount point
+Any container still running from a group that had this mount holds a now-dead FUSE handle. Kill those containers so they respawn without it:
+
+```bash
+docker ps --format '{{.Names}}' | grep '^nanoclaw-v2-'   # kill the ones for the affected groups
+```
+
+## 4. Remove the mount point and cache
 
 ```bash
 sudo rmdir /mnt/nanoclaw/{name}
+rm -rf {home}/.cache/rclone/vfs/nanoclaw-{name} {home}/.cache/rclone/vfsMeta/nanoclaw-{name}
 ```
 
 ## 5. Delete the rclone remote
