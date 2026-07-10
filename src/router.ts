@@ -33,7 +33,7 @@ import { resolveSession, writeSessionMessage, writeOutboundDirect } from './sess
 import { wakeContainer } from './container-runner.js';
 import { getSession } from './db/sessions.js';
 import type { AgentGroup, MessagingGroup, MessagingGroupAgent } from './types.js';
-import type { InboundEvent } from './channels/adapter.js';
+import type { ChannelAdapter, InboundEvent } from './channels/adapter.js';
 
 function generateId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -303,7 +303,7 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
     const scopeOk = engages && (!senderScopeGate || senderScopeGate(event, userId, mg, agent).allowed);
 
     if (engages && accessOk && scopeOk) {
-      await deliverToAgent(agent, agentGroup, mg, event, userId, adapter?.supportsThreads === true, true);
+      await deliverToAgent(agent, agentGroup, mg, event, userId, adapter, true);
       engagedCount++;
 
       // Mention-sticky: ask the adapter to subscribe the thread so the
@@ -334,7 +334,7 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
       // message (which also stages their attachments to disk via
       // writeSessionMessage → extractAttachmentFiles) is exactly what the
       // gate is meant to prevent.
-      await deliverToAgent(agent, agentGroup, mg, event, userId, adapter?.supportsThreads === true, false);
+      await deliverToAgent(agent, agentGroup, mg, event, userId, adapter, false);
       accumulatedCount++;
     } else {
       log.debug('Message not engaged for agent (drop policy)', {
@@ -419,19 +419,43 @@ async function deliverToAgent(
   mg: MessagingGroup,
   event: InboundEvent,
   userId: string | null,
-  adapterSupportsThreads: boolean,
+  adapter: ChannelAdapter | undefined,
   wake: boolean,
 ): Promise<void> {
+  // Always-on Matrix-style channels treat every top-level message as a new
+  // conversation: the agent's first reply creates a platform thread rooted at
+  // that message. Keep this adapter-driven so the router does not know Matrix
+  // thread encoding, and scope it to the explicit "always" wiring flavor so
+  // mention/sticky agents wired to the same room retain their normal timeline.
+  let routedThreadId = event.threadId;
+  const isAlwaysOn = agent.engage_mode === 'pattern' && (agent.engage_pattern ?? '.') === '.';
+  if (wake && isAlwaysOn && mg.is_group !== 0 && !event.replyTo && adapter?.threadIdForReplyToMessage) {
+    try {
+      routedThreadId = adapter.threadIdForReplyToMessage(event.platformId, event.threadId, event.message.id);
+      // A platform-specific mapping bug must not drop the inbound message.
+      // Falling back to its original thread preserves the pre-hook behavior.
+      // eslint-disable-next-line no-catch-all/no-catch-all -- best-effort thread mapping; never drop the message
+    } catch (err) {
+      log.warn('adapter.threadIdForReplyToMessage failed', {
+        channelType: event.channelType,
+        platformId: event.platformId,
+        threadId: event.threadId,
+        messageId: event.message.id,
+        err,
+      });
+    }
+  }
+
   // Apply the adapter thread policy: threaded adapter in a group chat →
   // per-thread session regardless of wiring. agent-shared preserved (it's
   // a cross-channel directive the adapter doesn't know about). DMs collapse
   // sub-threads to one session (is_group=0 short-circuit).
   let effectiveSessionMode = agent.session_mode;
-  if (adapterSupportsThreads && effectiveSessionMode !== 'agent-shared' && mg.is_group !== 0) {
+  if (adapter?.supportsThreads && effectiveSessionMode !== 'agent-shared' && mg.is_group !== 0) {
     effectiveSessionMode = 'per-thread';
   }
 
-  const { session, created } = resolveSession(agent.agent_group_id, mg.id, event.threadId, effectiveSessionMode);
+  const { session, created } = resolveSession(agent.agent_group_id, mg.id, routedThreadId, effectiveSessionMode);
 
   // The inbound row's (channel_type, platform_id, thread_id) is the address
   // the agent's reply will be delivered to. Normally it mirrors the source
@@ -440,7 +464,7 @@ async function deliverToAgent(
   const deliveryAddr = event.replyTo ?? {
     channelType: event.channelType,
     platformId: event.platformId,
-    threadId: event.threadId,
+    threadId: routedThreadId,
   };
 
   // Command gate: classify slash commands before they reach the container.
@@ -497,7 +521,7 @@ async function deliverToAgent(
       session.agent_group_id,
       event.channelType,
       event.platformId,
-      event.threadId,
+      routedThreadId,
       mg.instance,
     );
     const freshSession = getSession(session.id);

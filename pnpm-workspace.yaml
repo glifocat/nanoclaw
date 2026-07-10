@@ -1,4 +1,5 @@
 onlyBuiltDependencies:
+  - '@matrix-org/matrix-sdk-crypto-nodejs'
   - better-sqlite3
   - esbuild
   - protobufjs
@@ -6,3 +7,14 @@ onlyBuiltDependencies:
 
 pnpm:
   minimumReleaseAge: 4320
+
+# 0.6.1 contains the native-crypto security fix required by the Matrix
+# adapter. It was published 2026-06-12 and is outside minimumReleaseAge.
+overrides:
+  '@matrix-org/matrix-sdk-crypto-nodejs': 0.6.1
+  # matrix-bot-sdk 0.8.0 still uses request 2.x. Keep request's compatible
+  # form-data major while replacing its critically vulnerable old resolution.
+  'request@2.88.2>form-data': 2.5.6
+  'request@2.88.2>qs': 6.15.3
+  'request@2.88.2>tough-cookie': 4.1.4
+  'request-promise@4.2.6>tough-cookie': 4.1.4

@@ -22,7 +22,7 @@ export interface ChannelSetup {
   onMetadata(platformId: string, name?: string, isGroup?: boolean): void;
 
   /** Called when a user clicks a button/action in a card (e.g., ask_user_question response). */
-  onAction(questionId: string, selectedOption: string, userId: string): void;
+  onAction(questionId: string, selectedOption: string, userId: string, reason?: string): void;
 }
 
 /** Delivery address used for reply-to overrides and (normally) the inbound's own origin. */
@@ -148,6 +148,16 @@ export interface ChannelAdapter {
   setTyping?(platformId: string, threadId: string | null): Promise<void>;
   syncConversations?(): Promise<ConversationInfo[]>;
   resolveChannelName?(platformId: string): Promise<string | null>;
+
+  /**
+   * Choose the platform thread used for an engaged inbound message.
+   *
+   * The router calls this only for always-on group wirings. It lets adapters
+   * whose platforms create a thread by replying to a top-level event (Matrix,
+   * for example) root the agent's first response at that event without making
+   * the router understand platform-specific relation formats.
+   */
+  threadIdForReplyToMessage?(platformId: string, currentThreadId: string | null, messageId: string): string | null;
 
   /**
    * Subscribe the bot to a thread so follow-up messages route via the
