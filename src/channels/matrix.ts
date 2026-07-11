@@ -401,6 +401,35 @@ function renderQuestion(
   );
 }
 
+/**
+ * Compose a rich-card spec (title, description, children, actions) into the
+ * markdown document the formatted_body path renders. Shape mirrors what the
+ * Chat SDK bridge accepts for send_card; only URL actions survive (rendered
+ * as links) because send_card is fire-and-forget.
+ */
+function cardToMarkdown(card: Record<string, unknown>, fallbackText: string): string {
+  const parts: string[] = [];
+  if (typeof card.title === 'string' && card.title) parts.push(`### ${card.title}`);
+  if (typeof card.description === 'string' && card.description) parts.push(card.description);
+  if (Array.isArray(card.children)) {
+    for (const child of card.children) {
+      if (typeof child === 'string' && child) {
+        parts.push(child);
+      } else if (child && typeof child === 'object' && typeof (child as Record<string, unknown>).text === 'string') {
+        parts.push((child as Record<string, string>).text);
+      }
+    }
+  }
+  if (Array.isArray(card.actions)) {
+    for (const action of card.actions as Array<Record<string, unknown>>) {
+      if (typeof action.url === 'string' && action.url && typeof action.label === 'string' && action.label) {
+        parts.push(`[${action.label}](${action.url})`);
+      }
+    }
+  }
+  return parts.join('\n\n') || fallbackText;
+}
+
 function threadRelation(threadId: string | null): Record<string, unknown> | undefined {
   if (!threadId) return undefined;
   return {
@@ -840,8 +869,25 @@ export function createMatrixAdapter(
         });
       }
 
-      const text =
+      // Rich cards have no Matrix widget equivalent — compose the card spec
+      // into markdown (title heading, body paragraphs, URL actions as links)
+      // and let the normal formatted_body path render it. Non-URL actions are
+      // dropped, matching the Chat SDK bridge's send_card contract.
+      let text =
         typeof content.markdown === 'string' ? content.markdown : typeof content.text === 'string' ? content.text : '';
+      if (!text && content.type === 'card' && content.card && typeof content.card === 'object') {
+        text = cardToMarkdown(
+          content.card as Record<string, unknown>,
+          typeof content.fallbackText === 'string' ? content.fallbackText : '',
+        );
+      }
+      if (!text && !(message.files ?? []).length) {
+        log.warn('Matrix: outbound content had no renderable text — nothing delivered', {
+          contentType: typeof content.type === 'string' ? content.type : undefined,
+          keys: Object.keys(content),
+        });
+        return undefined;
+      }
       const relation = threadRelation(threadId);
       let firstEventId: string | undefined;
       if (text) {

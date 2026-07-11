@@ -419,6 +419,48 @@ describe('native Matrix adapter', () => {
     });
   });
 
+  it('renders card content as a formatted message instead of dropping it', async () => {
+    const adapter = createMatrixAdapter(config(), async () => deps);
+    await adapter.setup(hostSetup());
+
+    const before = FakeClient.latest.sentMessages.length;
+    const eventId = await adapter.deliver('matrix:!room:example.test', null, {
+      kind: 'chat',
+      content: {
+        type: 'card',
+        card: {
+          title: 'Prueba de card #2',
+          description: 'Segunda prueba de renderizado.',
+          children: [{ text: 'Si ves esto, funciona.' }, 'línea suelta'],
+          actions: [
+            { label: 'Abrir', url: 'https://example.test/x' },
+            { label: 'callback', value: 'nope' },
+          ],
+        },
+      },
+    });
+    expect(eventId).toBeDefined();
+    const sent = FakeClient.latest.sentMessages.at(-1)?.content;
+    expect(FakeClient.latest.sentMessages.length).toBe(before + 1);
+    expect(sent?.['body']).toContain('Prueba de card #2');
+    expect(sent?.['formatted_body']).toContain('<h3>Prueba de card #2</h3>');
+    expect(sent?.['formatted_body']).toContain('Si ves esto, funciona.');
+    expect(sent?.['formatted_body']).toContain('<a href="https://example.test/x">Abrir</a>');
+    expect(sent?.['formatted_body']).not.toContain('callback');
+  });
+
+  it('warns and sends nothing for content with no renderable text', async () => {
+    const adapter = createMatrixAdapter(config(), async () => deps);
+    await adapter.setup(hostSetup());
+    const before = FakeClient.latest.sentMessages.length;
+    const eventId = await adapter.deliver('matrix:!room:example.test', null, {
+      kind: 'chat',
+      content: { type: 'mystery', payload: 42 },
+    });
+    expect(eventId).toBeUndefined();
+    expect(FakeClient.latest.sentMessages.length).toBe(before);
+  });
+
   it('sends formatted_body HTML for markdown replies and omits it for plain text', async () => {
     const adapter = createMatrixAdapter(config(), async () => deps);
     await adapter.setup(hostSetup());
