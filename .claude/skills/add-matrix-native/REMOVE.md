@@ -16,6 +16,8 @@ Delete every file copied by the skill:
 ```bash
 rm -f \
   src/channels/matrix.ts \
+  src/channels/matrix-markdown.ts \
+  src/channels/matrix-markdown.test.ts \
   src/channels/matrix-crypto-integrity.ts \
   src/channels/matrix-crypto-integrity.test.ts \
   src/channels/matrix.test.ts \

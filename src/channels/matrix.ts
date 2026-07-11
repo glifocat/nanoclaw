@@ -21,6 +21,7 @@ import { normalizeOptions, type NormalizedOption } from './ask-question.js';
 import type { ChannelAdapter, ChannelSetup, ConversationInfo, InboundMessage, OutboundMessage } from './adapter.js';
 import { registerChannelAdapter } from './channel-registry.js';
 import { verifyMatrixCryptoBinary } from './matrix-crypto-integrity.js';
+import { markdownToMatrixHtml } from './matrix-markdown.js';
 
 const ENV_KEYS = [
   'MATRIX_BASE_URL',
@@ -720,9 +721,12 @@ export function createMatrixAdapter(
     const code = actionCode(questionId);
     const relation = threadRelation(threadId);
     const pendingCount = actionsForRoom(roomId).length + 1;
+    const questionBody = renderQuestion(title, question, options, code, pendingCount);
+    const formattedQuestion = markdownToMatrixHtml(questionBody);
     const messageId = await client.sendMessage(roomId, {
       msgtype: 'm.text',
-      body: renderQuestion(title, question, options, code, pendingCount),
+      body: questionBody,
+      ...(formattedQuestion ? { format: 'org.matrix.custom.html', formatted_body: formattedQuestion } : {}),
       ...(relation ? { 'm.relates_to': relation } : {}),
     });
 
@@ -841,9 +845,11 @@ export function createMatrixAdapter(
       const relation = threadRelation(threadId);
       let firstEventId: string | undefined;
       if (text) {
+        const formattedBody = markdownToMatrixHtml(text);
         firstEventId = await client.sendMessage(roomId, {
           msgtype: 'm.text',
           body: text,
+          ...(formattedBody ? { format: 'org.matrix.custom.html', formatted_body: formattedBody } : {}),
           ...(relation ? { 'm.relates_to': relation } : {}),
         });
       }

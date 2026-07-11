@@ -57,6 +57,8 @@ Always refresh the registry branch, then copy its canonical files:
 ```bash
 git fetch origin channels
 git show origin/channels:src/channels/matrix.ts                       > src/channels/matrix.ts
+git show origin/channels:src/channels/matrix-markdown.ts              > src/channels/matrix-markdown.ts
+git show origin/channels:src/channels/matrix-markdown.test.ts         > src/channels/matrix-markdown.test.ts
 git show origin/channels:src/channels/matrix-crypto-integrity.ts      > src/channels/matrix-crypto-integrity.ts
 git show origin/channels:src/channels/matrix-crypto-integrity.test.ts > src/channels/matrix-crypto-integrity.test.ts
 git show origin/channels:src/channels/matrix.test.ts                  > src/channels/matrix.test.ts

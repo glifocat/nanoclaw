@@ -419,6 +419,29 @@ describe('native Matrix adapter', () => {
     });
   });
 
+  it('sends formatted_body HTML for markdown replies and omits it for plain text', async () => {
+    const adapter = createMatrixAdapter(config(), async () => deps);
+    await adapter.setup(hostSetup());
+
+    await adapter.deliver('matrix:!room:example.test', null, {
+      kind: 'chat',
+      content: { text: '**Necesito que entres tú** a la Sede:\n\n- opción A\n- opción B' },
+    });
+    const formatted = FakeClient.latest.sentMessages.at(-1)?.content;
+    expect(formatted?.['format']).toBe('org.matrix.custom.html');
+    expect(formatted?.['formatted_body']).toContain('<strong>Necesito que entres tú</strong>');
+    expect(formatted?.['formatted_body']).toContain('<ul><li>opción A</li><li>opción B</li></ul>');
+    expect(formatted?.['body']).toContain('**Necesito que entres tú**');
+
+    await adapter.deliver('matrix:!room:example.test', null, {
+      kind: 'chat',
+      content: { text: 'sin formato' },
+    });
+    const plain = FakeClient.latest.sentMessages.at(-1)?.content;
+    expect(plain?.['format']).toBeUndefined();
+    expect(plain?.['formatted_body']).toBeUndefined();
+  });
+
   it('collapses existing and new Matrix threads in rooms not configured for threading', async () => {
     const adapter = createMatrixAdapter(config({ threadedRooms: new Set() }), async () => deps);
     const host = hostSetup();
