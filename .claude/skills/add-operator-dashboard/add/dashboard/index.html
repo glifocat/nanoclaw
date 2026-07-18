@@ -239,8 +239,6 @@ td .mono { color: var(--muted); }
 .chip.err  { color: var(--err);  background: color-mix(in srgb, var(--err) var(--tint), var(--surface)); }
 .chip.acc  { color: var(--brand); background: color-mix(in srgb, var(--brand) var(--tint), var(--surface)); }
 .count { color: var(--muted); font-size: 12px; }
-.actions-cell { white-space: nowrap; }
-.actions-cell .btn { margin: 1px 2px; }
 
 /* cards on small screens */
 @media (max-width: 699px) {
@@ -256,9 +254,6 @@ td .mono { color: var(--muted); }
   .data td::before { content: attr(data-label); flex: 0 0 108px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
   .data td.c-title { display: block; font-size: 15px; padding-bottom: 6px; }
   .data td.c-title::before { display: none; }
-  .data td.actions-cell { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px; white-space: normal; }
-  .data td.actions-cell::before { display: none; }
-  .data td.actions-cell .btn { margin: 0; }
 }
 
 /* ================= empty & skeleton ================= */
@@ -354,13 +349,17 @@ td .mono { color: var(--muted); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
 .note { font-size: 12.5px; color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--line)); border-radius: 10px; padding: 9px 12px; margin: 8px 0; display: flex; gap: 8px; align-items: flex-start; }
 .note .ic { flex: none; margin-top: 1px; }
+details.raw { margin-top: 22px; }
+details.raw summary { cursor: pointer; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 8px; }
+details.raw summary:hover { color: var(--ink); }
+#editslot .fbtns { justify-content: flex-start; margin-top: 8px; }
 
 /* ================= modal ================= */
 #modalwrap { position: fixed; inset: 0; z-index: var(--z-modal); display: none; align-items: center; justify-content: center; background: rgb(0 0 0 / .55); padding: 16px; }
 #modalwrap.on { display: flex; }
 #modal { width: min(520px, 100%); max-height: 88dvh; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 22px 24px; overscroll-behavior: contain; }
 #modal h3 { font-size: 16px; margin-bottom: 4px; }
-#modal .msub { color: var(--muted); font-size: 12px; margin-bottom: 14px; font-family: var(--mono); }
+.msub { color: var(--muted); font-size: 12px; margin-bottom: 14px; font-family: var(--mono); }
 @media (max-width: 699px) {
   #modalwrap { align-items: flex-end; padding: 0; }
   #modal { width: 100%; border-radius: var(--r-xl) var(--r-xl) 0 0; border-bottom: none; padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); }
@@ -605,6 +604,7 @@ const S = {
   auto: JSON.parse(localStorage.getItem("ncl_dash_auto") || "true"),
   topoZoom: 1,
   cfgCtx: null,
+  drawerRow: null,
   lastFocus: null,
   chat: null,
   chatTimer: null,
@@ -747,10 +747,12 @@ const REG = {
       { key: "folder", label: "Folder", help: "Directory under groups/ on the host. Unique, immutable. Required unless a template is given." },
       { key: "template", label: "Template (optional)", help: "Template ref under templates/ to stamp from (persona, MCP servers, skills, paused recurring tasks). Makes Folder optional." },
     ]},
+    edit: {
+      cmd: "groups update",
+      fields: r => [{ key: "name", label: "Name", req: 1, value: r.name }],
+      submit: (r, vals) => ncl("groups", "update", { id: r.id, ...vals }),
+    },
     rowActions: r => [
-      { l: "Edit", f: () => formModal("Edit agent group", `groups update`, [
-          { key: "name", label: "Name", req: 1, value: r.name },
-        ], vals => ncl("groups", "update", { id: r.id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
       { l: "Restart…", f: () => restartGroupModal(r) },
       { l: "Config", f: () => openGroupConfig(r) },
       { l: "Delete", danger: 1, f: () => formModal(`Delete "${r.name}"?`, "groups delete", [
@@ -782,13 +784,17 @@ const REG = {
       { key: "is-group", label: "Multi-user group chat", type: "select", options: [{v:"0",l:"0 — direct message"},{v:"1",l:"1 — group chat"}] },
       { key: "unknown-sender-policy", label: "Unknown sender policy", type: "select", options: ["strict","request_approval","public"].map(v=>({v,l:v})) },
     ]},
+    edit: {
+      cmd: "messaging-groups update",
+      fields: r => [
+        { key: "name", label: "Display name", value: r.name || "" },
+        { key: "instance", label: "Adapter instance", value: r.instance || "" },
+        { key: "is-group", label: "Multi-user group chat", type: "select", value: String(r.is_group ?? 0), options: [{v:"0",l:"0 — direct message"},{v:"1",l:"1 — group chat"}] },
+        { key: "unknown-sender-policy", label: "Unknown sender policy", type: "select", value: r.unknown_sender_policy, options: ["strict","request_approval","public"].map(v=>({v,l:v})) },
+      ],
+      submit: (r, vals) => ncl("messaging-groups", "update", { id: r.id, ...vals }),
+    },
     rowActions: r => [
-      { l: "Edit", f: () => formModal("Edit messaging group", "messaging-groups update", [
-          { key: "name", label: "Display name", value: r.name || "" },
-          { key: "instance", label: "Adapter instance", value: r.instance || "" },
-          { key: "is-group", label: "Multi-user group chat", type: "select", value: String(r.is_group ?? 0), options: [{v:"0",l:"0 — direct message"},{v:"1",l:"1 — group chat"}] },
-          { key: "unknown-sender-policy", label: "Unknown sender policy", type: "select", value: r.unknown_sender_policy, options: ["strict","request_approval","public"].map(v=>({v,l:v})) },
-        ], vals => ncl("messaging-groups", "update", { id: r.id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
       { l: "Send test", f: () => formModal(`Send into "${r.name || r.platform_id}"`, "messaging-groups send", [
           { key: "text", label: "Message text", req: 1, type: "textarea" },
           { key: "sender", label: "Sender label", help: 'Name the agent sees as the sender. Default "cli".' },
@@ -824,16 +830,20 @@ const REG = {
       { key: "threads", label: "Threads override", type: "select", options: [{v:"",l:"— inherit channel default —"},{v:"true",l:"true — honor platform threads"},{v:"false",l:"false — disable threads"}] },
       { key: "priority", label: "Priority", help: "Fanout order when multiple agents are wired to the same chat — higher first. Default 0." },
     ], after: "A reply destination for the agent is created automatically with the wiring; rename it under Destinations if the auto-generated name is ambiguous." },
+    edit: {
+      cmd: "wirings update",
+      fields: r => [
+        { key: "engage-mode", label: "Engage mode", type: "select", value: r.engage_mode, options: ENGAGE.map(v=>({v,l:v})) },
+        { key: "engage-pattern", label: "Engage pattern (regex)", value: r.engage_pattern || "" },
+        { key: "sender-scope", label: "Sender scope", type: "select", value: r.sender_scope, options: ["all","known"].map(v=>({v,l:v})) },
+        { key: "ignored-message-policy", label: "Ignored message policy", type: "select", value: r.ignored_message_policy, options: ["drop","accumulate"].map(v=>({v,l:v})) },
+        { key: "session-mode", label: "Session mode", type: "select", value: r.session_mode, options: ["shared","per-thread","agent-shared"].map(v=>({v,l:v})) },
+        { key: "threads", label: "Threads override", type: "select", value: r.threads == null ? "" : (r.threads ? "true" : "false"), options: [{v:"",l:"— unchanged (inherit) —"},{v:"true",l:"true — honor platform threads"},{v:"false",l:"false — disable threads"}], help: "Empty = leave unchanged; ncl has no flag to reset an override back to inherit." },
+        { key: "priority", label: "Priority", value: r.priority ?? "", help: "Fanout order — higher first." },
+      ],
+      submit: (r, vals) => ncl("wirings", "update", { id: r.id, ...vals }),
+    },
     rowActions: r => [
-      { l: "Edit", f: () => formModal("Edit wiring", "wirings update", [
-          { key: "engage-mode", label: "Engage mode", type: "select", value: r.engage_mode, options: ENGAGE.map(v=>({v,l:v})) },
-          { key: "engage-pattern", label: "Engage pattern (regex)", value: r.engage_pattern || "" },
-          { key: "sender-scope", label: "Sender scope", type: "select", value: r.sender_scope, options: ["all","known"].map(v=>({v,l:v})) },
-          { key: "ignored-message-policy", label: "Ignored message policy", type: "select", value: r.ignored_message_policy, options: ["drop","accumulate"].map(v=>({v,l:v})) },
-          { key: "session-mode", label: "Session mode", type: "select", value: r.session_mode, options: ["shared","per-thread","agent-shared"].map(v=>({v,l:v})) },
-          { key: "threads", label: "Threads override", type: "select", value: r.threads == null ? "" : (r.threads ? "true" : "false"), options: [{v:"",l:"— unchanged (inherit) —"},{v:"true",l:"true — honor platform threads"},{v:"false",l:"false — disable threads"}], help: "Empty = leave unchanged; ncl has no flag to reset an override back to inherit." },
-          { key: "priority", label: "Priority", value: r.priority ?? "", help: "Fanout order — higher first." },
-        ], vals => ncl("wirings", "update", { id: r.id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
       { l: "Delete", danger: 1, f: () => confirmModal("Delete this wiring?", `${mgName(r.messaging_group_id)} → ${agName(r.agent_group_id)} will stop routing.`,
           () => ncl("wirings", "delete", { id: r.id }), () => refresh(), "Delete wiring", { danger: 1 }) },
     ],
@@ -902,6 +912,38 @@ const REG = {
       { key: "script", label: "Pre-task gate script (bash)", type: "textarea", help: 'Runs BEFORE the agent wakes: 30s timeout, 1MB output cap. Last stdout line must be JSON {"wakeAgent": bool, "data": {…}} — wakeAgent=false handles the run without waking the agent (zero tokens).' },
       { key: "dangerously-override-recurrence-limit", label: "Allow more than 4 fires/day without a script gate", type: "checkbox" },
     ]},
+    edit: {
+      cmd: "tasks update",
+      // Hydrate from `tasks get` first so the form shows what it's editing —
+      // the list row only carries a truncated prompt and no script at all.
+      // api() throws on network failure; the degraded blank-means-unchanged
+      // form must still render in that case, not die silently.
+      hydrate: async r => {
+        try { const got = await ncl("tasks", "get", { id: r.series_id, session: r.session_id }); return got.ok ? got.data : null; }
+        catch { return null; }
+      },
+      fields: (r, t) => [
+        { key: "prompt", label: "Prompt", type: "textarea", rows: 5, req: t ? 1 : 0, value: t?.prompt ?? "",
+          help: t ? "" : "Couldn't fetch the current prompt — blank leaves it unchanged." },
+        { key: "process-after", label: "Next run time", help: "ISO 8601 or naive local. Blank = keep the current schedule." },
+        { key: "recurrence", label: "Recurrence (cron)", type: "cron", value: r.recurrence || "",
+          clearable: { sentinel: "null", note: "Recurrence will be cleared — the series becomes a one-shot." } },
+        { key: "script", label: "Pre-task gate script (bash)", type: "textarea", rows: 5, value: t?.script ?? "",
+          clearable: { sentinel: "null", note: "The gate script will be removed." },
+          help: t ? 'Runs BEFORE the agent wakes. Last stdout line must be JSON {"wakeAgent": bool, "data": {…}}.' : "Couldn't fetch the current script — blank leaves it unchanged." },
+        { key: "dangerously-override-recurrence-limit", label: "Allow more than 4 fires/day without a script gate", type: "checkbox" },
+      ],
+      submit: (r, vals) => ncl("tasks", "update", { id: r.series_id, session: r.session_id, ...vals }),
+      afterHydrate: (r, t) => {
+        const slot = $("#taskslot");
+        if (!slot) return;
+        if (!t) { slot.innerHTML = `<span class="chip err">couldn't fetch the run log</span>`; return; }
+        slot.innerHTML = `<div class="count" style="margin-bottom:6px">${esc(t.completed_runs ?? 0)} completed · ${esc(t.failed_runs ?? 0)} failed${t.origin_session_id ? "" : " · CLI-created"}</div>` +
+          ((t.recent_log || []).length
+            ? `<div class="mono" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px">${(t.recent_log || []).map(esc).join("\n")}</div>`
+            : `<div class="count">No log entries yet.</div>`);
+      },
+    },
     rowActions: r => [
       { l: "Run now", f: () => confirmModal(`Run "${r.series_id}" now?`, "Queues an extra run due immediately. The schedule is untouched — it neither consumes a one-shot nor advances a recurring series.",
           () => ncl("tasks", "run", { id: r.series_id, session: r.session_id }), () => refresh(), "Run now") },
@@ -910,27 +952,6 @@ const REG = {
             () => ncl("tasks", "resume", { id: r.series_id, session: r.session_id }), () => refresh(), "Resume task") }
         : { l: "Pause", f: () => confirmModal(`Pause "${r.series_id}"?`, "The series stops firing until you resume it. History is kept.",
             () => ncl("tasks", "pause", { id: r.series_id, session: r.session_id }), () => refresh(), "Pause task") },
-      { l: "Edit", f: async () => {
-          // Hydrate from `tasks get` first so the form shows what it's editing —
-          // the list row only carries a truncated prompt and no script at all.
-          // api() throws on network failure; the degraded blank-means-unchanged
-          // form must still open in that case, not die silently.
-          let got;
-          try { got = await ncl("tasks", "get", { id: r.series_id, session: r.session_id }); }
-          catch { got = { ok: false }; }
-          const t = got.ok && got.data ? got.data : {};
-          formModal("Edit task", "tasks update", [
-            { key: "prompt", label: "Prompt", type: "textarea", rows: 5, req: got.ok ? 1 : 0, value: t.prompt ?? "",
-              help: got.ok ? "" : "Couldn't fetch the current prompt — blank leaves it unchanged." },
-            { key: "process-after", label: "Next run time", help: "ISO 8601 or naive local. Blank = keep the current schedule." },
-            { key: "recurrence", label: "Recurrence (cron)", type: "cron", value: r.recurrence || "",
-              clearable: { sentinel: "null", note: "Recurrence will be cleared — the series becomes a one-shot." } },
-            { key: "script", label: "Pre-task gate script (bash)", type: "textarea", rows: 5, value: t.script ?? "",
-              clearable: { sentinel: "null", note: "The gate script will be removed." },
-              help: got.ok ? 'Runs BEFORE the agent wakes. Last stdout line must be JSON {"wakeAgent": bool, "data": {…}}.' : "Couldn't fetch the current script — blank leaves it unchanged." },
-            { key: "dangerously-override-recurrence-limit", label: "Allow more than 4 fires/day without a script gate", type: "checkbox" },
-          ], vals => ncl("tasks", "update", { id: r.series_id, session: r.session_id, ...vals }), () => refresh(), { submitLabel: "Save changes" });
-        } },
       { l: "Cancel", danger: 1, f: () => confirmModal(`Cancel "${r.series_id}"?`, "The live series stops for good (run history and log are kept). Use Delete to also remove history.",
           () => ncl("tasks", "cancel", { id: r.series_id, session: r.session_id }), () => refresh(), "Cancel task", { danger: 1 }) },
       { l: "Delete", danger: 1, f: () => formModal(`Delete "${r.series_id}"?`, "tasks delete", [
@@ -956,11 +977,11 @@ const REG = {
       { key: "kind", label: "Kind", req: 1, help: 'Channel type identifier, e.g. "telegram", "whatsapp".' },
       { key: "display-name", label: "Display name" },
     ]},
-    rowActions: r => [
-      { l: "Edit", f: () => formModal("Edit user", "users update", [
-          { key: "display-name", label: "Display name", value: r.display_name || "" },
-        ], vals => ncl("users", "update", { id: r.id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
-    ],
+    edit: {
+      cmd: "users update",
+      fields: r => [{ key: "display-name", label: "Display name", value: r.display_name || "" }],
+      submit: (r, vals) => ncl("users", "update", { id: r.id, ...vals }),
+    },
   },
 
   roles: {
@@ -1217,8 +1238,8 @@ function renderTablePage(page, loading) {
       </div>
     </div>
     <div class="tablewrap"><table class="data">
-      <thead><tr>${def.cols.map(c => `<th aria-sort="none" id="th-${c.k}"><button type="button" onclick="sortBy('${page}','${c.k}')">${c.l} <span class="arrow" id="arr-${c.k}"></span></button></th>`).join("")}<th><span class="sr">Actions</span></th></tr></thead>
-      <tbody id="tbody">${loading ? `<tr><td colspan="${def.cols.length + 1}" style="padding:16px">` + Array.from({ length: 5 }, (_, i) => `<span class="skel" style="width:${90 - (i % 3) * 16}%;margin:12px 0"></span>`).join("") + `</td></tr>` : ""}</tbody>
+      <thead><tr>${def.cols.map(c => `<th aria-sort="none" id="th-${c.k}"><button type="button" onclick="sortBy('${page}','${c.k}')">${c.l} <span class="arrow" id="arr-${c.k}"></span></button></th>`).join("")}</tr></thead>
+      <tbody id="tbody">${loading ? `<tr><td colspan="${def.cols.length}" style="padding:16px">` + Array.from({ length: 5 }, (_, i) => `<span class="skel" style="width:${90 - (i % 3) * 16}%;margin:12px 0"></span>`).join("") + `</td></tr>` : ""}</tbody>
     </table></div>`;
   if (!loading) renderRows(page);
 }
@@ -1284,22 +1305,21 @@ function renderRows(page) {
     if (el) el.textContent = cur ? (S.sort[page].dir === 1 ? "▲" : "▼") : "";
     if (th) th.setAttribute("aria-sort", cur ? (S.sort[page].dir === 1 ? "ascending" : "descending") : "none");
   });
-  if (!rows.length) { tb.innerHTML = `<tr><td colspan="${def.cols.length + 1}">${emptyHtml(def)}</td></tr>`; return; }
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="${def.cols.length}">${emptyHtml(def)}</td></tr>`; return; }
+  // Row actions live in the detail drawer now — the row itself is a single
+  // "open it" target, not a strip of tiny buttons.
   tb.innerHTML = rows.map((r, i) =>
     `<tr tabindex="0" onclick="openDetail('${page}',${i})" onkeydown="if(event.key==='Enter'){openDetail('${page}',${i})}">` +
     def.cols.map((c, ci) => `<td data-label="${esc(c.l)}"${ci === 0 ? ' class="c-title"' : ""}>${c.r(r)}</td>`).join("") +
-    `<td class="actions-cell" onclick="event.stopPropagation()">${rowBtns(page, rows[i], i)}</td></tr>`
+    `</tr>`
   ).join("");
 }
-function rowBtns(page, r, i) {
-  const def = REG[page];
-  if (!def.rowActions) return "";
-  return def.rowActions(r).map((a, j) =>
-    `<button class="btn sm ${a.danger ? "danger" : ""}" onclick="rowAction('${page}',${i},${j})">${esc(a.l)}</button>`
-  ).join(" ");
-}
-function rowAction(page, i, j) {
-  const r = S.rendered[i];
+/* Drawer actions resolve against the row object captured at open time — NOT a
+   positional index into S.rendered, which auto-refresh and post-action
+   refresh() rewrite while the drawer stays open (a stale index would aim
+   Pause/Delete at whatever row now occupies that position). */
+function drawerAction(page, j) {
+  const r = S.drawerRow;
   if (!r) return;
   REG[page].rowActions(r)[j].f();
 }
@@ -1311,40 +1331,66 @@ function openDetail(page, i) {
   if (!r) return;
   const name = r.name || r.display_name || r.title || r.local_name || r.sender_name || r.series_id || r.user_id || r.id || r.approval_id || "";
   const sub = `${def.label.replace(/s$/, "")} · ${r.id || r.series_id || r.approval_id || r.local_name || r.user_id || ""}`;
+  S.drawerRow = r;
   openDrawer(String(name), sub, `
     ${def.rowActions ? `<div class="actions">${def.rowActions(r).map((a, j) =>
-      `<button class="btn sm ${a.danger ? "danger" : ""}" onclick="rowAction('${page}',${i},${j})">${esc(a.l)}</button>`).join("")}</div>` : ""}
-    <div class="dsec">Fields</div>
+      `<button class="btn sm ${a.danger ? "danger" : ""}" onclick="drawerAction('${page}',${j})">${esc(a.l)}</button>`).join("")}</div>` : ""}
+    ${def.edit ? `<div class="dsec">Edit</div>${def.edit.cmd ? `<div class="msub">ncl ${esc(def.edit.cmd)}</div>` : ""}<div id="editslot"><span class="skel" style="width:70%"></span></div>` : ""}
+    ${page === "groups" ? `<div class="dsec">Container config</div><div id="cfgslot" class="count">Fetching config…</div>` : ""}
+    ${page === "tasks" ? `<div class="dsec">Run history</div><div id="taskslot" class="count">Fetching run log…</div>` : ""}
+    <details class="raw"><summary>All fields</summary>
     <table class="kv">${Object.entries(r).map(([k, v]) =>
       `<tr><td>${esc(k)}</td><td class="mono copyable" title="Tap to copy" data-copy="${esc(String(v ?? ""))}">${esc(prettyVal(v))}</td></tr>`).join("")}
-    </table>
-    ${page === "groups" ? `<div class="dsec">Container config</div><div id="cfgslot" class="count">Fetching config…</div>` : ""}
-    ${page === "tasks" ? `<div class="dsec">Full task (tasks get)</div><div id="taskslot" class="count">Fetching full prompt, script and run log…</div>` : ""}
+    </table></details>
   `);
+  if (def.edit) renderDrawerEdit(page, r);
   if (page === "groups") loadGroupConfig(r);
-  if (page === "tasks") loadTaskDetail(r);
 }
-/* List rows truncate the prompt and omit the script/run log entirely — the
-   `get` verb has them, so hydrate the drawer with the full record. */
-async function loadTaskDetail(r) {
-  const res = await ncl("tasks", "get", { id: r.series_id, session: r.session_id });
-  const slot = $("#taskslot");
-  if (!slot) return;
-  if (!res.ok) { slot.innerHTML = `<span class="chip err">${esc(res.error?.message || "failed")}</span>`; return; }
-  const t = res.data;
-  slot.innerHTML = `
-    <table class="kv">
-      <tr><td>prompt</td><td class="mono copyable" title="Tap to copy" data-copy="${esc(t.prompt ?? "")}">${esc(t.prompt ?? "—")}</td></tr>
-      <tr><td>script</td><td class="mono copyable" title="Tap to copy" data-copy="${esc(t.script ?? "")}">${esc(t.script ?? "—")}</td></tr>
-      <tr><td>origin_session_id</td><td class="mono">${esc(t.origin_session_id ?? "— (CLI-created)")}</td></tr>
-      <tr><td>completed_runs</td><td class="mono">${esc(t.completed_runs ?? 0)}</td></tr>
-      <tr><td>failed_runs</td><td class="mono">${esc(t.failed_runs ?? 0)}</td></tr>
-    </table>
-    <div class="dsec">Recent run log</div>
-    ${(t.recent_log || []).length
-      ? `<div class="mono" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px">${(t.recent_log || []).map(esc).join("\n")}</div>`
-      : `<div class="count">No log entries yet.</div>`}
-  `;
+/* The drawer IS the edit surface: prefilled form inline, actions above, raw
+   field dump collapsed below. Resources declare an `edit` def in REG —
+   fields(r, hydrated?), submit(r, vals), optional hydrate (fetch the full
+   record first; list rows may be truncated) and afterHydrate (extra sections
+   fed from the same fetch, e.g. the task run log). */
+async function renderDrawerEdit(page, r) {
+  const def = REG[page];
+  let extra = null;
+  if (def.edit.hydrate) extra = await def.edit.hydrate(r);
+  const slot = $("#editslot");
+  // Bail if the drawer closed, the user navigated, or another row was opened
+  // while the hydrate was in flight — mounting row A's form (and Save target)
+  // inside row B's drawer would edit the wrong record.
+  if (!slot || S.page !== page || S.drawerRow !== r) return;
+  if (def.edit.afterHydrate) def.edit.afterHydrate(r, extra);
+  const fields = def.edit.fields(r, extra);
+  const cleared = {};
+  slot.innerHTML = fields.map(f => fieldHtml(f, "d-", fields)).join("") +
+    `<div class="fbtns"><button class="btn pri" id="dsave">Save changes</button></div>`;
+  wireFieldBehaviors(slot, fields, cleared, "d-");
+  slot.onkeydown = e => {
+    if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); $("#dsave").click(); }
+  };
+  $("#dsave").onclick = async () => {
+    resetFieldErrors(slot);
+    const oldErr = slot.querySelector(".modal-err"); if (oldErr) oldErr.remove();
+    const { vals, firstBad } = collectFields(fields, cleared, "d-");
+    if (firstBad) { firstBad.focus(); return; }
+    const sb = $("#dsave");
+    sb.disabled = true; sb.textContent = "Saving…";
+    let res;
+    try { res = await def.edit.submit(r, vals); } catch (e) { res = { ok: false, error: { message: e.message } }; }
+    if (!res.ok) {
+      sb.disabled = false; sb.textContent = "Save changes";
+      slot.querySelector(".fbtns").before(inlineErrBox(res));
+      return;
+    }
+    toast(true, `${def.label.replace(/s$/, "")} updated`, typeof res.data === "string" ? res.data : "", res.cmd);
+    await refresh();
+    if (S.page !== page) return;
+    // reopen against the refreshed row so prefills and the field dump are current
+    const key = r.id ?? r.series_id;
+    const idx = S.rendered.findIndex(x => (x.id ?? x.series_id) === key);
+    if (idx >= 0) openDetail(page, idx); else closeDrawer();
+  };
 }
 function prettyVal(v) {
   if (v === null || v === undefined) return "—";
@@ -1367,6 +1413,7 @@ function closeDrawer() {
   const d = $("#drawer");
   if (!d.classList.contains("on")) return;
   d.classList.remove("on");
+  S.drawerRow = null;
   syncOverlay();
   if (S.lastFocus && S.lastFocus.isConnected) S.lastFocus.focus();
 }
@@ -1559,7 +1606,146 @@ function selOptionsHtml(list, placeholder, selected) {
    - dependsOn + optionsFor(depVal): select whose options follow another field
    - suggest: array|fn — datalist suggestions on a free-text input
    - validate(v): string error | null, checked client-side before submit
-   - type "cron": input + preset chips + live next-fires echo */
+   - type "cron": input + preset chips + live next-fires echo
+
+   The engine below is shared by the create/confirm modal (pfx "f-") and the
+   drawer's inline edit form (pfx "d-") — the prefix keeps element ids unique
+   when both are on screen at once. */
+function fieldHtml(f, pfx, fields) {
+  const id = pfx + f.key;
+  let input;
+  if (f.type === "select") {
+    let optHtml;
+    if (f.dependsOn) {
+      const dep = fields.find(x => x.key === f.dependsOn);
+      const depVal = String(dep?.value ?? "");
+      optHtml = selOptionsHtml(depVal && f.optionsFor ? f.optionsFor(depVal) : [],
+        depVal ? "— select —" : `— choose ${dep ? dep.label.toLowerCase() : f.dependsOn} first —`, f.value);
+    } else {
+      const opts2 = f.optionsFn ? f.optionsFn() : f.options;
+      optHtml = selOptionsHtml(opts2, f.req && !f.value ? "— select —" : null, f.value);
+    }
+    input = `<select id="${id}">${optHtml}</select>`;
+  } else if (f.type === "checkbox") {
+    input = `<label class="toggle"><input type="checkbox" id="${id}"${f.value ? " checked" : ""}> yes</label>`;
+  } else if (f.type === "textarea") {
+    input = `<textarea id="${id}" rows="${f.rows || 3}">${esc(f.value ?? "")}</textarea>`;
+  } else if (f.type === "cron") {
+    input = `<input id="${id}" value="${esc(f.value ?? "")}" autocomplete="off" spellcheck="false">
+      <div class="presetrow">${CRON_PRESETS.map(p => `<button type="button" class="preset" data-cron="${esc(p.v)}" data-for="${id}">${esc(p.l)}</button>`).join("")}</div>
+      <div class="fecho" id="${id}-echo" aria-live="polite"></div>`;
+  } else {
+    const dl = f.suggest ? (typeof f.suggest === "function" ? f.suggest() : f.suggest) : null;
+    input = `<input id="${id}" value="${esc(f.value ?? "")}" ${dl ? `list="${id}-dl"` : ""} ${f.expect ? 'autocomplete="off" spellcheck="false"' : ""}>` +
+      (dl ? `<datalist id="${id}-dl">${dl.map(v => `<option value="${esc(v)}">`).join("")}</datalist>` : "");
+  }
+  const clearBtn = f.clearable ? `<button type="button" class="btn sm clearbtn" data-clear="${esc(f.key)}">Clear</button>` : "";
+  return `<div class="ffield" id="ff-${id}">
+    <div class="lrow"><label for="${id}">${esc(f.label)} ${f.req ? '<b class="req" aria-hidden="true">*</b>' : ""}</label>${clearBtn}</div>
+    ${input}
+    ${f.help ? `<div class="help">${esc(f.help)}</div>` : ""}
+    <div class="ferr" id="${id}-err"></div>
+  </div>`;
+}
+function wireFieldBehaviors(root, fields, cleared, pfx) {
+  // clear/undo toggles
+  root.querySelectorAll("[data-clear]").forEach(b => {
+    const key = b.dataset.clear;
+    const f = fields.find(x => x.key === key);
+    b.setAttribute("aria-label", `Clear ${f.label}`);
+    b.onclick = () => {
+      const ff = document.getElementById("ff-" + pfx + key);
+      const isCleared = cleared[key] = !cleared[key];
+      const inp = ff.querySelector("input, textarea, select");
+      if (inp) inp.disabled = isCleared;
+      b.textContent = isCleared ? "Undo" : "Clear";
+      b.setAttribute("aria-label", isCleared ? `Undo clearing ${f.label}` : `Clear ${f.label}`);
+      // a cleared cron field must not keep advertising its old "Next: …" future
+      // or clickable-looking presets
+      ff.querySelectorAll(".preset").forEach(p => p.disabled = isCleared);
+      if (f.type === "cron" && inp) {
+        const echoEl = document.getElementById(inp.id + "-echo");
+        if (echoEl) { if (isCleared) { echoEl.className = "fecho"; echoEl.textContent = ""; } else updateCronEcho(inp); }
+      }
+      let noteEl = ff.querySelector(".cleared-note");
+      if (isCleared) {
+        if (!noteEl) { noteEl = document.createElement("div"); noteEl.className = "cleared-note"; noteEl.setAttribute("role", "status"); ff.appendChild(noteEl); }
+        noteEl.textContent = (f.clearable && f.clearable.note) || "Will be cleared.";
+      } else if (noteEl) noteEl.remove();
+    };
+  });
+  // cron presets + live echo
+  root.querySelectorAll(".preset").forEach(b => b.onclick = () => {
+    const inp = document.getElementById(b.dataset.for);
+    if (!inp || inp.disabled) return;
+    inp.value = b.dataset.cron;
+    inp.dispatchEvent(new Event("input"));
+  });
+  fields.filter(f => f.type === "cron").forEach(f => {
+    const inp = document.getElementById(pfx + f.key);
+    if (!inp) return;
+    inp.addEventListener("input", () => updateCronEcho(inp));
+    updateCronEcho(inp);
+  });
+  // dependent selects (e.g. destination target follows target type)
+  fields.filter(f => f.dependsOn && f.optionsFor).forEach(f => {
+    const dep = document.getElementById(pfx + f.dependsOn);
+    const target = document.getElementById(pfx + f.key);
+    if (!dep || !target) return;
+    dep.addEventListener("change", () => {
+      target.innerHTML = selOptionsHtml(dep.value ? f.optionsFor(dep.value) : [],
+        dep.value ? "— select —" : "— choose above first —", "");
+    });
+  });
+}
+function collectFields(fields, cleared, pfx) {
+  const vals = {};
+  let firstBad = null;
+  const bad = (f, msg) => {
+    const ff = document.getElementById("ff-" + pfx + f.key);
+    if (ff) {
+      ff.classList.add("invalid");
+      const e = document.getElementById(pfx + f.key + "-err");
+      if (e) e.textContent = msg;
+    }
+    const inp = document.getElementById(pfx + f.key);
+    // announce to AT: focus lands on the field, describedby carries the message
+    if (inp) { inp.setAttribute("aria-invalid", "true"); inp.setAttribute("aria-describedby", pfx + f.key + "-err"); }
+    if (!firstBad) firstBad = inp;
+  };
+  for (const f of fields) {
+    if (cleared[f.key]) { vals[f.key] = f.clearable.sentinel; continue; }
+    const el = document.getElementById(pfx + f.key);
+    let v = f.type === "checkbox" ? el.checked : el.value.trim();
+    if (f.req && (v === "" || v === false || v === undefined)) { bad(f, "Required."); continue; }
+    if (f.expect !== undefined) {
+      // Normalize both sides: the input arrives trimmed, so trim the expected
+      // value too — otherwise a name with leading/trailing whitespace can never
+      // be typed to match and the group becomes permanently undeletable.
+      const expect = String(f.expect).trim();
+      if (String(v).trim() !== expect) { bad(f, `Type "${expect}" exactly to confirm.`); continue; }
+      continue; // confirmation-only field, not an ncl arg
+    }
+    if (v !== "" && v !== false && f.validate) {
+      const msg = f.validate(String(v));
+      if (msg) { bad(f, msg); continue; }
+    }
+    if (v !== "" && v !== false) vals[f.key] = v;
+  }
+  return { vals, firstBad };
+}
+function resetFieldErrors(root) {
+  root.querySelectorAll(".ffield.invalid").forEach(el => el.classList.remove("invalid"));
+  root.querySelectorAll("[aria-invalid]").forEach(el => { el.removeAttribute("aria-invalid"); el.removeAttribute("aria-describedby"); });
+}
+function inlineErrBox(res) {
+  // pinned inside the form — corner toasts vanish and detach the failure from
+  // the form that caused it
+  const box = document.createElement("div");
+  box.className = "modal-err"; box.setAttribute("role", "alert");
+  box.innerHTML = `${ico("alert")}<div><b>${esc(res.error?.message || "The command failed.")}</b>${res.cmd ? `<div class="cmd">${esc(res.cmd)}</div>` : ""}</div>`;
+  return box;
+}
 function formModal(title, cmdLabel, fields, submitFn, onDone, opts = {}) {
   const { note, danger, submitLabel } = opts;
   S.lastFocus = document.activeElement;
@@ -1570,42 +1756,7 @@ function formModal(title, cmdLabel, fields, submitFn, onDone, opts = {}) {
     <div class="msub">ncl ${esc(cmdLabel)}</div>
     ${danger ? `<div class="confirm-danger">${ico("alert")}<span>This changes the live instance. Double-check before you go.</span></div>` : ""}
     ${note ? `<div class="note">${ico("alert")}<span>${esc(note)}</span></div>` : ""}
-    ${fields.map(f => {
-      const id = "f-" + f.key;
-      let input;
-      if (f.type === "select") {
-        let optHtml;
-        if (f.dependsOn) {
-          const dep = fields.find(x => x.key === f.dependsOn);
-          const depVal = String(dep?.value ?? "");
-          optHtml = selOptionsHtml(depVal && f.optionsFor ? f.optionsFor(depVal) : [],
-            depVal ? "— select —" : `— choose ${dep ? dep.label.toLowerCase() : f.dependsOn} first —`, f.value);
-        } else {
-          const opts2 = f.optionsFn ? f.optionsFn() : f.options;
-          optHtml = selOptionsHtml(opts2, f.req && !f.value ? "— select —" : null, f.value);
-        }
-        input = `<select id="${id}">${optHtml}</select>`;
-      } else if (f.type === "checkbox") {
-        input = `<label class="toggle"><input type="checkbox" id="${id}"> yes</label>`;
-      } else if (f.type === "textarea") {
-        input = `<textarea id="${id}" rows="${f.rows || 3}">${esc(f.value ?? "")}</textarea>`;
-      } else if (f.type === "cron") {
-        input = `<input id="${id}" value="${esc(f.value ?? "")}" autocomplete="off" spellcheck="false">
-          <div class="presetrow">${CRON_PRESETS.map(p => `<button type="button" class="preset" data-cron="${esc(p.v)}" data-for="${id}">${esc(p.l)}</button>`).join("")}</div>
-          <div class="fecho" id="${id}-echo" aria-live="polite"></div>`;
-      } else {
-        const dl = f.suggest ? (typeof f.suggest === "function" ? f.suggest() : f.suggest) : null;
-        input = `<input id="${id}" value="${esc(f.value ?? "")}" ${dl ? `list="${id}-dl"` : ""} ${f.expect ? 'autocomplete="off" spellcheck="false"' : ""}>` +
-          (dl ? `<datalist id="${id}-dl">${dl.map(v => `<option value="${esc(v)}">`).join("")}</datalist>` : "");
-      }
-      const clearBtn = f.clearable ? `<button type="button" class="btn sm clearbtn" data-clear="${esc(f.key)}">Clear</button>` : "";
-      return `<div class="ffield" id="ff-${f.key}">
-        <div class="lrow"><label for="${id}">${esc(f.label)} ${f.req ? '<b class="req" aria-hidden="true">*</b>' : ""}</label>${clearBtn}</div>
-        ${input}
-        ${f.help ? `<div class="help">${esc(f.help)}</div>` : ""}
-        <div class="ferr" id="${id}-err"></div>
-      </div>`;
-    }).join("")}
+    ${fields.map(f => fieldHtml(f, "f-", fields)).join("")}
     <div class="fbtns">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn ${danger ? "danger-fill" : "pri"}" id="msubmit">${esc(submitLabel || "Submit")}</button>
@@ -1617,94 +1768,13 @@ function formModal(title, cmdLabel, fields, submitFn, onDone, opts = {}) {
   m.onkeydown = e => {
     if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); if (modalSubmit) modalSubmit(); }
   };
-  // clear/undo toggles
-  m.querySelectorAll("[data-clear]").forEach(b => {
-    const key = b.dataset.clear;
-    const f = fields.find(x => x.key === key);
-    b.setAttribute("aria-label", `Clear ${f.label}`);
-    b.onclick = () => {
-      const ff = $("#ff-" + CSS.escape(key));
-      const cleared = modalCleared[key] = !modalCleared[key];
-      const inp = ff.querySelector("input, textarea, select");
-      if (inp) inp.disabled = cleared;
-      b.textContent = cleared ? "Undo" : "Clear";
-      b.setAttribute("aria-label", cleared ? `Undo clearing ${f.label}` : `Clear ${f.label}`);
-      // a cleared cron field must not keep advertising its old "Next: …" future
-      // or clickable-looking presets
-      ff.querySelectorAll(".preset").forEach(p => p.disabled = cleared);
-      if (f.type === "cron" && inp) {
-        const echoEl = document.getElementById(inp.id + "-echo");
-        if (echoEl) { if (cleared) { echoEl.className = "fecho"; echoEl.textContent = ""; } else updateCronEcho(inp); }
-      }
-      let noteEl = ff.querySelector(".cleared-note");
-      if (cleared) {
-        if (!noteEl) { noteEl = document.createElement("div"); noteEl.className = "cleared-note"; noteEl.setAttribute("role", "status"); ff.appendChild(noteEl); }
-        noteEl.textContent = (f.clearable && f.clearable.note) || "Will be cleared.";
-      } else if (noteEl) noteEl.remove();
-    };
-  });
-  // cron presets + live echo
-  m.querySelectorAll(".preset").forEach(b => b.onclick = () => {
-    const inp = document.getElementById(b.dataset.for);
-    if (!inp || inp.disabled) return;
-    inp.value = b.dataset.cron;
-    inp.dispatchEvent(new Event("input"));
-  });
-  fields.filter(f => f.type === "cron").forEach(f => {
-    const inp = $("#f-" + CSS.escape(f.key));
-    if (!inp) return;
-    inp.addEventListener("input", () => updateCronEcho(inp));
-    updateCronEcho(inp);
-  });
-  // dependent selects (e.g. destination target follows target type)
-  fields.filter(f => f.dependsOn && f.optionsFor).forEach(f => {
-    const dep = $("#f-" + CSS.escape(f.dependsOn));
-    const target = $("#f-" + CSS.escape(f.key));
-    if (!dep || !target) return;
-    dep.addEventListener("change", () => {
-      target.innerHTML = selOptionsHtml(dep.value ? f.optionsFor(dep.value) : [],
-        dep.value ? "— select —" : "— choose above first —", "");
-    });
-  });
+  wireFieldBehaviors(m, fields, modalCleared, "f-");
   const first = m.querySelector("input, select, textarea, #msubmit");
   if (first) first.focus();
   modalSubmit = async () => {
-    m.querySelectorAll(".ffield.invalid").forEach(el => el.classList.remove("invalid"));
-    m.querySelectorAll("[aria-invalid]").forEach(el => { el.removeAttribute("aria-invalid"); el.removeAttribute("aria-describedby"); });
-    const oldErr = document.getElementById("modal-err"); if (oldErr) oldErr.remove();
-    const vals = {};
-    let firstBad = null;
-    const bad = (f, msg) => {
-      const ff = $("#ff-" + CSS.escape(f.key));
-      if (ff) {
-        ff.classList.add("invalid");
-        const e = document.getElementById("f-" + f.key + "-err");
-        if (e) e.textContent = msg;
-      }
-      const inp = $("#f-" + CSS.escape(f.key));
-      // announce to AT: focus lands on the field, describedby carries the message
-      if (inp) { inp.setAttribute("aria-invalid", "true"); inp.setAttribute("aria-describedby", "f-" + f.key + "-err"); }
-      if (!firstBad) firstBad = inp;
-    };
-    for (const f of fields) {
-      if (modalCleared[f.key]) { vals[f.key] = f.clearable.sentinel; continue; }
-      const el = $("#f-" + CSS.escape(f.key));
-      let v = f.type === "checkbox" ? el.checked : el.value.trim();
-      if (f.req && (v === "" || v === false || v === undefined)) { bad(f, "Required."); continue; }
-      if (f.expect !== undefined) {
-        // Normalize both sides: the input arrives trimmed, so trim the expected
-        // value too — otherwise a name with leading/trailing whitespace can never
-        // be typed to match and the group becomes permanently undeletable.
-        const expect = String(f.expect).trim();
-        if (String(v).trim() !== expect) { bad(f, `Type "${expect}" exactly to confirm.`); continue; }
-        continue; // confirmation-only field, not an ncl arg
-      }
-      if (v !== "" && v !== false && f.validate) {
-        const msg = f.validate(String(v));
-        if (msg) { bad(f, msg); continue; }
-      }
-      if (v !== "" && v !== false) vals[f.key] = v;
-    }
+    resetFieldErrors(m);
+    const oldErr = m.querySelector(".modal-err"); if (oldErr) oldErr.remove();
+    const { vals, firstBad } = collectFields(fields, modalCleared, "f-");
     if (firstBad) { firstBad.focus(); return; }
     const sb = $("#msubmit");
     sb.disabled = true; sb.textContent = "Running…";
@@ -1714,13 +1784,8 @@ function formModal(title, cmdLabel, fields, submitFn, onDone, opts = {}) {
       toast(true, title.replace(/[?]$/, "") + " — done", typeof res.data === "string" ? res.data : summarize(res.data), res.cmd);
       closeModal(); onDone && onDone(res);
     } else {
-      // keep the modal open and pin the error to it — corner toasts vanish and
-      // detach the failure from the form that caused it
       sb.disabled = false; sb.textContent = submitLabel || "Submit";
-      const box = document.createElement("div");
-      box.className = "modal-err"; box.id = "modal-err"; box.setAttribute("role", "alert");
-      box.innerHTML = `${ico("alert")}<div><b>${esc(res.error?.message || "The command failed.")}</b>${res.cmd ? `<div class="cmd">${esc(res.cmd)}</div>` : ""}</div>`;
-      m.querySelector(".fbtns").before(box);
+      m.querySelector(".fbtns").before(inlineErrBox(res));
     }
   };
   $("#msubmit").onclick = modalSubmit;
