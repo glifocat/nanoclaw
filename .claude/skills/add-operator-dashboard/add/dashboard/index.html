@@ -380,6 +380,24 @@ td .mono { color: var(--muted); }
 .confirm-danger .ic { flex: none; margin-top: 1px; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); cursor: pointer; user-select: none; min-height: 32px; }
 .toggle input { width: 18px; height: 18px; min-height: 0; accent-color: var(--brand-fill); }
+.ffield .lrow { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.ffield .lrow label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.ffield .lrow .clearbtn { margin-left: auto; }
+.ffield .ferr { display: none; font-size: 12px; color: var(--err); margin-top: 4px; }
+.ffield.invalid .ferr { display: block; }
+.ffield.invalid input, .ffield.invalid select, .ffield.invalid textarea { border-color: var(--err); box-shadow: 0 0 0 1px var(--err); }
+.cleared-note { font-size: 12.5px; color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); border: 1px dashed color-mix(in srgb, var(--warn) 40%, var(--line)); border-radius: 10px; padding: 8px 12px; margin-top: 6px; }
+.presetrow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.preset { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); transition: border-color .15s, color .15s; }
+.preset:hover { border-color: var(--brand); color: var(--brand); }
+.fecho { font-size: 12px; color: var(--ok); margin-top: 5px; }
+.fecho.bad { color: var(--err); }
+.fecho.dim { color: var(--muted); }
+.preset:disabled { opacity: .5; cursor: default; }
+.preset:disabled:hover { border-color: var(--line-strong); color: var(--muted); }
+.modal-err { display: flex; gap: 8px; align-items: flex-start; color: var(--err); font-size: 12.5px; background: color-mix(in srgb, var(--err) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--err) 35%, var(--line)); border-radius: 10px; padding: 10px 12px; margin-top: 12px; }
+.modal-err .ic { flex: none; margin-top: 1px; }
+.modal-err .cmd { font-family: var(--mono); font-size: 11px; color: var(--muted); word-break: break-all; margin-top: 3px; font-weight: 400; }
 
 /* ================= more sheet (mobile nav) ================= */
 #moresheet {
@@ -689,6 +707,12 @@ const mgOpts = () => (S.cache["messaging-groups"] || []).map(m => ({ v: m.id, l:
 const userOpts = () => (S.cache.users || []).map(u => ({ v: u.id, l: `${u.display_name || ""} ${u.id}`.trim() }));
 const agName = id => { const g = (S.cache.groups || []).find(g => g.id === id); return g ? g.name : id; };
 const mgName = id => { const m = (S.cache["messaging-groups"] || []).find(m => m.id === id); return m ? (m.name || m.platform_id) : id; };
+// Declared before REG on purpose — REG's field defs reference it at script-eval
+// time, so declaring it later in the file is a TDZ ReferenceError that kills
+// the whole script.
+const channelTypeSuggestions = () =>
+  [...new Set((S.cache["messaging-groups"] || []).map(m => m.channel_type)
+    .concat(["whatsapp", "telegram", "discord", "slack", "matrix", "signal", "imessage", "cli"]))].sort();
 
 function chip(v, cls, title) { return `<span class="chip ${cls || ""}"${title ? ` title="${esc(title)}"` : ""}>${esc(v)}</span>`; }
 function statusChip(v) {
@@ -751,7 +775,7 @@ const REG = {
       { k: "id", l: "ID", r: r => `<span class="mono">${esc(r.id)}</span>` },
     ],
     create: { title: "New messaging group", btn: "Create messaging group", fields: [
-      { key: "channel-type", label: "Channel type", req: 1, help: "Adapter type: telegram, discord, slack, whatsapp, matrix, …" },
+      { key: "channel-type", label: "Channel type", req: 1, suggest: channelTypeSuggestions, help: "Adapter type — pick a known one from the suggestions or type another." },
       { key: "platform-id", label: "Platform ID", req: 1, help: "Chat ID / snowflake / phone / email — platform-specific." },
       { key: "name", label: "Display name" },
       { key: "instance", label: "Adapter instance", help: "Defaults to channel_type when omitted." },
@@ -772,7 +796,7 @@ const REG = {
         ], vals => ncl("messaging-groups", "send", { "channel-type": r.channel_type, "platform-id": r.platform_id, ...(r.instance ? { instance: r.instance } : {}), ...vals }), null,
         { submitLabel: "Send message", note: "Routes through the live router as a real inbound message — the wired agent wakes and its reply goes to the real chat, not here." }) },
       { l: "Delete", danger: 1, f: () => confirmModal(`Delete "${r.name || r.platform_id}"?`, "The chat is unregistered from routing. Its wirings stop working.",
-          () => ncl("messaging-groups", "delete", { id: r.id }), () => refresh(), "Delete messaging group") },
+          () => ncl("messaging-groups", "delete", { id: r.id }), () => refresh(), "Delete messaging group", { danger: 1 }) },
     ],
   },
 
@@ -811,7 +835,7 @@ const REG = {
           { key: "priority", label: "Priority", value: r.priority ?? "", help: "Fanout order — higher first." },
         ], vals => ncl("wirings", "update", { id: r.id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
       { l: "Delete", danger: 1, f: () => confirmModal("Delete this wiring?", `${mgName(r.messaging_group_id)} → ${agName(r.agent_group_id)} will stop routing.`,
-          () => ncl("wirings", "delete", { id: r.id }), () => refresh(), "Delete wiring") },
+          () => ncl("wirings", "delete", { id: r.id }), () => refresh(), "Delete wiring", { danger: 1 }) },
     ],
   },
 
@@ -831,11 +855,11 @@ const REG = {
       { key: "agent-group-id", label: "Agent group (owner)", req: 1, type: "select", optionsFn: agOpts },
       { key: "local-name", label: "Local name", req: 1, help: "Lowercase, dash-separated; unique per agent." },
       { key: "target-type", label: "Target type", req: 1, type: "select", options: [{v:"channel",l:"channel — messaging group"},{v:"agent",l:"agent — another agent group"}] },
-      { key: "target-id", label: "Target ID", req: 1, help: "messaging_groups.id for channel, agent_groups.id for agent." },
+      { key: "target-id", label: "Target", req: 1, type: "select", dependsOn: "target-type", optionsFor: v => v === "agent" ? agOpts() : mgOpts() },
     ]},
     rowActions: r => [
       { l: "Remove", danger: 1, f: () => confirmModal(`Remove destination "${r.local_name}"?`, `${agName(r.agent_group_id)} loses permission to send to this target.`,
-          () => ncl("destinations", "remove", { "agent-group-id": r.agent_group_id, "local-name": r.local_name }), () => refresh(), "Remove destination") },
+          () => ncl("destinations", "remove", { "agent-group-id": r.agent_group_id, "local-name": r.local_name }), () => refresh(), "Remove destination", { danger: 1 }) },
     ],
   },
 
@@ -873,7 +897,7 @@ const REG = {
       { key: "group", label: "Agent group", req: 1, type: "select", optionsFn: agOpts },
       { key: "prompt", label: "Prompt", req: 1, type: "textarea", help: "What the agent wakes to." },
       { key: "name", label: "Name", help: "Short descriptive name → readable task id (<slug>-<hex>)." },
-      { key: "recurrence", label: "Recurrence (cron)", help: "Instance TZ. Omit for a one-shot. More than 4 fires/day is refused unless script-gated or overridden below." },
+      { key: "recurrence", label: "Recurrence (cron)", type: "cron", help: "Instance TZ. Omit for a one-shot. More than 4 fires/day is refused unless script-gated or overridden below." },
       { key: "process-after", label: "First/next run time", help: "ISO 8601 or naive local. Required for one-shots; with a recurrence the first run derives from the cron grid." },
       { key: "script", label: "Pre-task gate script (bash)", type: "textarea", help: 'Runs BEFORE the agent wakes: 30s timeout, 1MB output cap. Last stdout line must be JSON {"wakeAgent": bool, "data": {…}} — wakeAgent=false handles the run without waking the agent (zero tokens).' },
       { key: "dangerously-override-recurrence-limit", label: "Allow more than 4 fires/day without a script gate", type: "checkbox" },
@@ -886,15 +910,29 @@ const REG = {
             () => ncl("tasks", "resume", { id: r.series_id, session: r.session_id }), () => refresh(), "Resume task") }
         : { l: "Pause", f: () => confirmModal(`Pause "${r.series_id}"?`, "The series stops firing until you resume it. History is kept.",
             () => ncl("tasks", "pause", { id: r.series_id, session: r.session_id }), () => refresh(), "Pause task") },
-      { l: "Edit", f: () => formModal("Edit task", "tasks update", [
-          { key: "prompt", label: "Prompt", type: "textarea", help: "Blank = keep the current prompt (the table shows a truncated preview — don't paste it back)." },
-          { key: "process-after", label: "Next run time", help: "ISO 8601 or naive local. Blank = unchanged." },
-          { key: "recurrence", label: "Recurrence (cron)", value: r.recurrence || "", help: 'Blank = unchanged; type "null" to clear (makes it a one-shot).' },
-          { key: "script", label: "Pre-task gate script (bash)", type: "textarea", help: 'Blank = unchanged; type "null" to remove the script.' },
-          { key: "dangerously-override-recurrence-limit", label: "Allow more than 4 fires/day without a script gate", type: "checkbox" },
-        ], vals => ncl("tasks", "update", { id: r.series_id, session: r.session_id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
+      { l: "Edit", f: async () => {
+          // Hydrate from `tasks get` first so the form shows what it's editing —
+          // the list row only carries a truncated prompt and no script at all.
+          // api() throws on network failure; the degraded blank-means-unchanged
+          // form must still open in that case, not die silently.
+          let got;
+          try { got = await ncl("tasks", "get", { id: r.series_id, session: r.session_id }); }
+          catch { got = { ok: false }; }
+          const t = got.ok && got.data ? got.data : {};
+          formModal("Edit task", "tasks update", [
+            { key: "prompt", label: "Prompt", type: "textarea", rows: 5, req: got.ok ? 1 : 0, value: t.prompt ?? "",
+              help: got.ok ? "" : "Couldn't fetch the current prompt — blank leaves it unchanged." },
+            { key: "process-after", label: "Next run time", help: "ISO 8601 or naive local. Blank = keep the current schedule." },
+            { key: "recurrence", label: "Recurrence (cron)", type: "cron", value: r.recurrence || "",
+              clearable: { sentinel: "null", note: "Recurrence will be cleared — the series becomes a one-shot." } },
+            { key: "script", label: "Pre-task gate script (bash)", type: "textarea", rows: 5, value: t.script ?? "",
+              clearable: { sentinel: "null", note: "The gate script will be removed." },
+              help: got.ok ? 'Runs BEFORE the agent wakes. Last stdout line must be JSON {"wakeAgent": bool, "data": {…}}.' : "Couldn't fetch the current script — blank leaves it unchanged." },
+            { key: "dangerously-override-recurrence-limit", label: "Allow more than 4 fires/day without a script gate", type: "checkbox" },
+          ], vals => ncl("tasks", "update", { id: r.series_id, session: r.session_id, ...vals }), () => refresh(), { submitLabel: "Save changes" });
+        } },
       { l: "Cancel", danger: 1, f: () => confirmModal(`Cancel "${r.series_id}"?`, "The live series stops for good (run history and log are kept). Use Delete to also remove history.",
-          () => ncl("tasks", "cancel", { id: r.series_id, session: r.session_id }), () => refresh(), "Cancel task") },
+          () => ncl("tasks", "cancel", { id: r.series_id, session: r.session_id }), () => refresh(), "Cancel task", { danger: 1 }) },
       { l: "Delete", danger: 1, f: () => formModal(`Delete "${r.series_id}"?`, "tasks delete", [
           { key: "_confirm", label: `Type the task id (${r.series_id}) to confirm`, req: 1, expect: r.series_id },
         ], () => ncl("tasks", "delete", { id: r.series_id, session: r.session_id }), () => refresh(),
@@ -943,7 +981,7 @@ const REG = {
     ]},
     rowActions: r => [
       { l: "Revoke", danger: 1, f: () => confirmModal(`Revoke ${r.role} from ${r.user_id}?`, r.agent_group_id ? `Scoped to ${agName(r.agent_group_id)}.` : "This is a global grant.",
-          () => ncl("roles", "revoke", { user: r.user_id, role: r.role, ...(r.agent_group_id ? { group: r.agent_group_id } : {}) }), () => refresh(), "Revoke role") },
+          () => ncl("roles", "revoke", { user: r.user_id, role: r.role, ...(r.agent_group_id ? { group: r.agent_group_id } : {}) }), () => refresh(), "Revoke role", { danger: 1 }) },
     ],
   },
 
@@ -964,7 +1002,7 @@ const REG = {
     ]},
     rowActions: r => [
       { l: "Remove", danger: 1, f: () => confirmModal(`Remove ${r.user_id} from ${agName(r.agent_group_id)}?`, "The user loses membership access to this agent group.",
-          () => ncl("members", "remove", { user: r.user_id, group: r.agent_group_id }), () => refresh(), "Remove member") },
+          () => ncl("members", "remove", { user: r.user_id, group: r.agent_group_id }), () => refresh(), "Remove member", { danger: 1 }) },
     ],
   },
 
@@ -986,7 +1024,7 @@ const REG = {
     ]},
     rowActions: r => [
       { l: "Remove", danger: 1, f: () => confirmModal("Remove this policy?", `${agName(r.from_agent_group_id)} → ${agName(r.to_agent_group_id)} goes back to free flow.`,
-          () => ncl("policies", "remove", { from: r.from_agent_group_id, to: r.to_agent_group_id }), () => refresh(), "Remove policy") },
+          () => ncl("policies", "remove", { from: r.from_agent_group_id, to: r.to_agent_group_id }), () => refresh(), "Remove policy", { danger: 1 }) },
     ],
   },
 
@@ -1345,17 +1383,17 @@ async function loadGroupConfig(g) {
   if (!res.ok) { slot.innerHTML = `<span class="chip err">${esc(res.error?.message || "failed")}</span>`; return; }
   const c = res.data;
   S.cfgCtx = { id: g.id, g, mcp: Object.keys(c.mcp_servers || {}), apt: c.packages_apt || [], npm: c.packages_npm || [] };
-  const scalarField = (key, label, value, opts) => `
+  const scalarField = (key, label, value, opts, suggest) => `
     <div class="ffield"><label for="cfg-${key}">${label}</label>
       ${opts ? `<select id="cfg-${key}">${opts.map(o => `<option value="${esc(o)}" ${String(value ?? "") === o ? "selected" : ""}>${esc(o || "(default)")}</option>`).join("")}</select>`
-        : `<input id="cfg-${key}" value="${esc(value ?? "")}">`}
+        : `<input id="cfg-${key}" value="${esc(value ?? "")}"${suggest ? ` list="cfg-${key}-dl"` : ""}>${suggest ? `<datalist id="cfg-${key}-dl">${suggest.map(v => `<option value="${esc(v)}">`).join("")}</datalist>` : ""}`}
     </div>`;
   slot.innerHTML = `
     <div class="note">${ico("alert")}<span>Scalar changes need a <b>restart</b>; package changes need <b>restart --rebuild</b>.</span></div>
     <div class="dsec">Scalars</div>
-    ${scalarField("provider", "Provider", c.provider)}
+    ${scalarField("provider", "Provider", c.provider, null, ["claude", "opencode", "codex"])}
     ${scalarField("model", "Model", c.model)}
-    ${scalarField("effort", "Effort", c.effort)}
+    ${scalarField("effort", "Effort", c.effort, null, ["low", "medium", "high"])}
     ${scalarField("image-tag", "Image tag", c.image_tag)}
     ${scalarField("assistant-name", "Assistant name", c.assistant_name)}
     ${scalarField("max-messages-per-prompt", "Max messages per prompt", c.max_messages_per_prompt)}
@@ -1390,12 +1428,12 @@ async function loadGroupConfig(g) {
 function rmMcp(i) {
   const { id, mcp } = S.cfgCtx; const name = mcp[i];
   confirmModal(`Remove MCP server "${name}"?`, "Takes effect after the group restarts.",
-    () => ncl("groups", "config remove-mcp-server", { id, name }), () => reopenCfg(id), "Remove MCP server");
+    () => ncl("groups", "config remove-mcp-server", { id, name }), () => reopenCfg(id), "Remove MCP server", { danger: 1 });
 }
 function rmPkg(kind, i) {
   const { id } = S.cfgCtx; const pkg = S.cfgCtx[kind][i];
   confirmModal(`Remove ${kind} package "${pkg}"?`, "Takes effect after restart --rebuild.",
-    () => ncl("groups", "config remove-package", { id, [kind]: pkg }), () => reopenCfg(id), "Remove package");
+    () => ncl("groups", "config remove-package", { id, [kind]: pkg }), () => reopenCfg(id), "Remove package", { danger: 1 });
 }
 function reopenCfg(id) {
   const g = (S.cache.groups || []).find(x => x.id === id) || { id, name: id };
@@ -1415,8 +1453,10 @@ function addMcpModal(id) {
   formModal("Add MCP server", "groups config add-mcp-server", [
     { key: "name", label: "Server name", req: 1 },
     { key: "command", label: "Command", req: 1, help: "e.g. npx" },
-    { key: "args", label: "Args (JSON array)", help: 'e.g. ["-y","@some/mcp-server"]' },
-    { key: "env", label: "Env (JSON object)", help: 'e.g. {"KEY":"value"}' },
+    { key: "args", label: "Args (JSON array)", help: 'e.g. ["-y","@some/mcp-server"]',
+      validate: v => { try { return Array.isArray(JSON.parse(v)) ? null : "Must be a JSON array, e.g. [\"-y\",\"pkg\"]."; } catch { return "Not valid JSON."; } } },
+    { key: "env", label: "Env (JSON object)", help: 'e.g. {"KEY":"value"}',
+      validate: v => { try { const o = JSON.parse(v); return o && typeof o === "object" && !Array.isArray(o) ? null : "Must be a JSON object, e.g. {\"KEY\":\"value\"}."; } catch { return "Not valid JSON."; } } },
   ], vals => ncl("groups", "config add-mcp-server", { id, ...vals }), () => reopenCfg(id),
     { submitLabel: "Add server", note: "Takes effect after the group restarts." });
 }
@@ -1435,6 +1475,67 @@ function restartGroupModal(g) {
     { submitLabel: "Restart group", danger: 1, note: "This kills the group's running containers on the LIVE instance." });
 }
 
+/* ============================ cron helpers =========================== */
+const CRON_PRESETS = [
+  { l: "daily 9:00", v: "0 9 * * *" },
+  { l: "weekdays 8:30", v: "30 8 * * 1-5" },
+  { l: "hourly", v: "0 * * * *" },
+  { l: "Mondays 9:00", v: "0 9 * * 1" },
+  { l: "1st of month 9:00", v: "0 9 1 * *" },
+];
+function parseCronField(f, min, max) {
+  const out = new Set();
+  for (const part of f.split(",")) {
+    let m;
+    if (part === "*") { for (let i = min; i <= max; i++) out.add(i); }
+    else if ((m = part.match(/^\*\/(\d+)$/))) { const st = +m[1]; if (!st) return null; for (let i = min; i <= max; i += st) out.add(i); }
+    else if ((m = part.match(/^(\d+)-(\d+)(?:\/(\d+))?$/))) { const a = +m[1], b = +m[2], st = +(m[3] || 1); if (a < min || b > max || a > b || !st) return null; for (let i = a; i <= b; i += st) out.add(i); }
+    else if ((m = part.match(/^(\d+)$/))) { const v = +m[1]; if (v < min || v > max) return null; out.add(v); }
+    else return null;
+  }
+  return out;
+}
+function parseCron(expr) {
+  const p = String(expr).trim().split(/\s+/);
+  if (p.length !== 5) return null;
+  const mins = parseCronField(p[0], 0, 59), hrs = parseCronField(p[1], 0, 23),
+    dom = parseCronField(p[2], 1, 31), mon = parseCronField(p[3], 1, 12), dow = parseCronField(p[4], 0, 7);
+  if (!mins || !hrs || !dom || !mon || !dow) return null;
+  if (dow.has(7)) dow.add(0);
+  return { mins, hrs, dom, mon, dow, raw: p };
+}
+function cronNextRuns(c, n) {
+  const out = [];
+  const d = new Date(); d.setSeconds(0, 0); d.setMinutes(d.getMinutes() + 1);
+  const domAll = c.raw[2] === "*", dowAll = c.raw[4] === "*";
+  // vixie-cron rule: when both day fields are restricted, either may match
+  const dayOk = () => (domAll && dowAll) || (domAll ? c.dow.has(d.getDay()) : dowAll ? c.dom.has(d.getDate()) : (c.dom.has(d.getDate()) || c.dow.has(d.getDay())));
+  for (let guard = 0; guard < 200000 && out.length < n; guard++) {
+    if (!c.mon.has(d.getMonth() + 1)) { d.setMonth(d.getMonth() + 1, 1); d.setHours(0, 0, 0, 0); continue; }
+    if (!dayOk()) { d.setDate(d.getDate() + 1); d.setHours(0, 0, 0, 0); continue; }
+    if (!c.hrs.has(d.getHours())) { d.setHours(d.getHours() + 1, 0, 0, 0); continue; }
+    if (!c.mins.has(d.getMinutes())) { d.setMinutes(d.getMinutes() + 1); continue; }
+    out.push(new Date(d)); d.setMinutes(d.getMinutes() + 1);
+  }
+  return out;
+}
+function updateCronEcho(inp) {
+  const el = document.getElementById(inp.id + "-echo");
+  if (!el) return;
+  const v = inp.value.trim();
+  if (!v || v === "null") { el.className = "fecho"; el.textContent = ""; return; }
+  const c = parseCron(v);
+  // The preview parser only speaks numeric 5-field cron; the server (cron-parser)
+  // also accepts MON-FRI, @daily, 6-field seconds, etc. Never claim "invalid"
+  // for what we merely can't preview — and never block the submit on it.
+  if (!c) { el.className = "fecho dim"; el.textContent = "No preview for this expression — the server validates it on save."; return; }
+  const runs = cronNextRuns(c, 3);
+  const perDay = c.hrs.size * c.mins.size;
+  const when = runs.map(d => d.toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })).join(" · ");
+  el.className = perDay > 4 ? "fecho bad" : "fecho";
+  el.textContent = (runs.length ? "Next: " + when : "No fire in the next year") +
+    (perDay > 4 ? ` — ≈${perDay} fires/day: needs a gate script or the override below` : "");
+}
 /* ============================ modals/forms =========================== */
 function openCreate(page) {
   const def = REG[page];
@@ -1446,9 +1547,23 @@ function openCreate(page) {
 }
 
 let modalSubmit = null;
+let modalCleared = null;
+function selOptionsHtml(list, placeholder, selected) {
+  return (placeholder ? [{ v: "", l: placeholder }] : []).concat(list || []).map(o =>
+    `<option value="${esc(o.v)}" ${String(selected ?? "") === String(o.v) ? "selected" : ""}>${esc(o.l)}</option>`).join("");
+}
+/* Field def options beyond the basics:
+   - value: prefill (edit forms should ALWAYS prefill — no blank-means-unchanged)
+   - clearable: {sentinel, note} — renders a Clear/Undo toggle that submits the
+     sentinel (e.g. "null") instead of asking users to type it
+   - dependsOn + optionsFor(depVal): select whose options follow another field
+   - suggest: array|fn — datalist suggestions on a free-text input
+   - validate(v): string error | null, checked client-side before submit
+   - type "cron": input + preset chips + live next-fires echo */
 function formModal(title, cmdLabel, fields, submitFn, onDone, opts = {}) {
   const { note, danger, submitLabel } = opts;
   S.lastFocus = document.activeElement;
+  modalCleared = {};
   const wrap = $("#modalwrap"); const m = $("#modal");
   m.innerHTML = `
     <h3 id="modal-title">${esc(title)}</h3>
@@ -1457,19 +1572,39 @@ function formModal(title, cmdLabel, fields, submitFn, onDone, opts = {}) {
     ${note ? `<div class="note">${ico("alert")}<span>${esc(note)}</span></div>` : ""}
     ${fields.map(f => {
       const id = "f-" + f.key;
-      const opts2 = f.optionsFn ? f.optionsFn() : f.options;
       let input;
       if (f.type === "select") {
-        input = `<select id="${id}">${(f.req && !f.value ? [{ v: "", l: "— select —" }] : []).concat(opts2 || []).map(o =>
-          `<option value="${esc(o.v)}" ${String(f.value ?? "") === String(o.v) ? "selected" : ""}>${esc(o.l)}</option>`).join("")}</select>`;
+        let optHtml;
+        if (f.dependsOn) {
+          const dep = fields.find(x => x.key === f.dependsOn);
+          const depVal = String(dep?.value ?? "");
+          optHtml = selOptionsHtml(depVal && f.optionsFor ? f.optionsFor(depVal) : [],
+            depVal ? "— select —" : `— choose ${dep ? dep.label.toLowerCase() : f.dependsOn} first —`, f.value);
+        } else {
+          const opts2 = f.optionsFn ? f.optionsFn() : f.options;
+          optHtml = selOptionsHtml(opts2, f.req && !f.value ? "— select —" : null, f.value);
+        }
+        input = `<select id="${id}">${optHtml}</select>`;
       } else if (f.type === "checkbox") {
         input = `<label class="toggle"><input type="checkbox" id="${id}"> yes</label>`;
       } else if (f.type === "textarea") {
-        input = `<textarea id="${id}" rows="3">${esc(f.value ?? "")}</textarea>`;
+        input = `<textarea id="${id}" rows="${f.rows || 3}">${esc(f.value ?? "")}</textarea>`;
+      } else if (f.type === "cron") {
+        input = `<input id="${id}" value="${esc(f.value ?? "")}" autocomplete="off" spellcheck="false">
+          <div class="presetrow">${CRON_PRESETS.map(p => `<button type="button" class="preset" data-cron="${esc(p.v)}" data-for="${id}">${esc(p.l)}</button>`).join("")}</div>
+          <div class="fecho" id="${id}-echo" aria-live="polite"></div>`;
       } else {
-        input = `<input id="${id}" value="${esc(f.value ?? "")}" ${f.expect ? 'autocomplete="off" spellcheck="false"' : ""}>`;
+        const dl = f.suggest ? (typeof f.suggest === "function" ? f.suggest() : f.suggest) : null;
+        input = `<input id="${id}" value="${esc(f.value ?? "")}" ${dl ? `list="${id}-dl"` : ""} ${f.expect ? 'autocomplete="off" spellcheck="false"' : ""}>` +
+          (dl ? `<datalist id="${id}-dl">${dl.map(v => `<option value="${esc(v)}">`).join("")}</datalist>` : "");
       }
-      return `<div class="ffield"><label for="${id}">${esc(f.label)} ${f.req ? '<b class="req" aria-hidden="true">*</b>' : ""}</label>${input}${f.help ? `<div class="help">${esc(f.help)}</div>` : ""}</div>`;
+      const clearBtn = f.clearable ? `<button type="button" class="btn sm clearbtn" data-clear="${esc(f.key)}">Clear</button>` : "";
+      return `<div class="ffield" id="ff-${f.key}">
+        <div class="lrow"><label for="${id}">${esc(f.label)} ${f.req ? '<b class="req" aria-hidden="true">*</b>' : ""}</label>${clearBtn}</div>
+        ${input}
+        ${f.help ? `<div class="help">${esc(f.help)}</div>` : ""}
+        <div class="ferr" id="${id}-err"></div>
+      </div>`;
     }).join("")}
     <div class="fbtns">
       <button class="btn" onclick="closeModal()">Cancel</button>
@@ -1477,32 +1612,116 @@ function formModal(title, cmdLabel, fields, submitFn, onDone, opts = {}) {
     </div>`;
   m.setAttribute("aria-labelledby", "modal-title");
   wrap.classList.add("on");
+  // Enter submits — the modal has no <form>, so implicit submission never fires
+  // and Enter in a text input (e.g. the type-to-confirm delete field) was dead.
+  m.onkeydown = e => {
+    if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); if (modalSubmit) modalSubmit(); }
+  };
+  // clear/undo toggles
+  m.querySelectorAll("[data-clear]").forEach(b => {
+    const key = b.dataset.clear;
+    const f = fields.find(x => x.key === key);
+    b.setAttribute("aria-label", `Clear ${f.label}`);
+    b.onclick = () => {
+      const ff = $("#ff-" + CSS.escape(key));
+      const cleared = modalCleared[key] = !modalCleared[key];
+      const inp = ff.querySelector("input, textarea, select");
+      if (inp) inp.disabled = cleared;
+      b.textContent = cleared ? "Undo" : "Clear";
+      b.setAttribute("aria-label", cleared ? `Undo clearing ${f.label}` : `Clear ${f.label}`);
+      // a cleared cron field must not keep advertising its old "Next: …" future
+      // or clickable-looking presets
+      ff.querySelectorAll(".preset").forEach(p => p.disabled = cleared);
+      if (f.type === "cron" && inp) {
+        const echoEl = document.getElementById(inp.id + "-echo");
+        if (echoEl) { if (cleared) { echoEl.className = "fecho"; echoEl.textContent = ""; } else updateCronEcho(inp); }
+      }
+      let noteEl = ff.querySelector(".cleared-note");
+      if (cleared) {
+        if (!noteEl) { noteEl = document.createElement("div"); noteEl.className = "cleared-note"; noteEl.setAttribute("role", "status"); ff.appendChild(noteEl); }
+        noteEl.textContent = (f.clearable && f.clearable.note) || "Will be cleared.";
+      } else if (noteEl) noteEl.remove();
+    };
+  });
+  // cron presets + live echo
+  m.querySelectorAll(".preset").forEach(b => b.onclick = () => {
+    const inp = document.getElementById(b.dataset.for);
+    if (!inp || inp.disabled) return;
+    inp.value = b.dataset.cron;
+    inp.dispatchEvent(new Event("input"));
+  });
+  fields.filter(f => f.type === "cron").forEach(f => {
+    const inp = $("#f-" + CSS.escape(f.key));
+    if (!inp) return;
+    inp.addEventListener("input", () => updateCronEcho(inp));
+    updateCronEcho(inp);
+  });
+  // dependent selects (e.g. destination target follows target type)
+  fields.filter(f => f.dependsOn && f.optionsFor).forEach(f => {
+    const dep = $("#f-" + CSS.escape(f.dependsOn));
+    const target = $("#f-" + CSS.escape(f.key));
+    if (!dep || !target) return;
+    dep.addEventListener("change", () => {
+      target.innerHTML = selOptionsHtml(dep.value ? f.optionsFor(dep.value) : [],
+        dep.value ? "— select —" : "— choose above first —", "");
+    });
+  });
   const first = m.querySelector("input, select, textarea, #msubmit");
   if (first) first.focus();
   modalSubmit = async () => {
+    m.querySelectorAll(".ffield.invalid").forEach(el => el.classList.remove("invalid"));
+    m.querySelectorAll("[aria-invalid]").forEach(el => { el.removeAttribute("aria-invalid"); el.removeAttribute("aria-describedby"); });
+    const oldErr = document.getElementById("modal-err"); if (oldErr) oldErr.remove();
     const vals = {};
+    let firstBad = null;
+    const bad = (f, msg) => {
+      const ff = $("#ff-" + CSS.escape(f.key));
+      if (ff) {
+        ff.classList.add("invalid");
+        const e = document.getElementById("f-" + f.key + "-err");
+        if (e) e.textContent = msg;
+      }
+      const inp = $("#f-" + CSS.escape(f.key));
+      // announce to AT: focus lands on the field, describedby carries the message
+      if (inp) { inp.setAttribute("aria-invalid", "true"); inp.setAttribute("aria-describedby", "f-" + f.key + "-err"); }
+      if (!firstBad) firstBad = inp;
+    };
     for (const f of fields) {
+      if (modalCleared[f.key]) { vals[f.key] = f.clearable.sentinel; continue; }
       const el = $("#f-" + CSS.escape(f.key));
       let v = f.type === "checkbox" ? el.checked : el.value.trim();
-      if (f.req && (v === "" || v === false || v === undefined)) { toast(false, "Missing required field", f.label); return; }
+      if (f.req && (v === "" || v === false || v === undefined)) { bad(f, "Required."); continue; }
       if (f.expect !== undefined) {
         // Normalize both sides: the input arrives trimmed, so trim the expected
         // value too — otherwise a name with leading/trailing whitespace can never
         // be typed to match and the group becomes permanently undeletable.
         const expect = String(f.expect).trim();
-        if (String(v).trim() !== expect) { toast(false, "Name doesn't match", `Type "${expect}" exactly to confirm.`); return; }
+        if (String(v).trim() !== expect) { bad(f, `Type "${expect}" exactly to confirm.`); continue; }
         continue; // confirmation-only field, not an ncl arg
+      }
+      if (v !== "" && v !== false && f.validate) {
+        const msg = f.validate(String(v));
+        if (msg) { bad(f, msg); continue; }
       }
       if (v !== "" && v !== false) vals[f.key] = v;
     }
+    if (firstBad) { firstBad.focus(); return; }
     const sb = $("#msubmit");
     sb.disabled = true; sb.textContent = "Running…";
     let res;
     try { res = await submitFn(vals); } catch (e) { res = { ok: false, error: { message: e.message } }; }
-    toast(res.ok, res.ok ? title.replace(/[?]$/, "") + " — done" : title.replace(/[?]$/, "") + " — failed",
-      res.ok ? (typeof res.data === "string" ? res.data : summarize(res.data)) : res.error?.message, res.cmd);
-    if (res.ok) { closeModal(); onDone && onDone(res); }
-    else { sb.disabled = false; sb.textContent = submitLabel || "Submit"; }
+    if (res.ok) {
+      toast(true, title.replace(/[?]$/, "") + " — done", typeof res.data === "string" ? res.data : summarize(res.data), res.cmd);
+      closeModal(); onDone && onDone(res);
+    } else {
+      // keep the modal open and pin the error to it — corner toasts vanish and
+      // detach the failure from the form that caused it
+      sb.disabled = false; sb.textContent = submitLabel || "Submit";
+      const box = document.createElement("div");
+      box.className = "modal-err"; box.id = "modal-err"; box.setAttribute("role", "alert");
+      box.innerHTML = `${ico("alert")}<div><b>${esc(res.error?.message || "The command failed.")}</b>${res.cmd ? `<div class="cmd">${esc(res.cmd)}</div>` : ""}</div>`;
+      m.querySelector(".fbtns").before(box);
+    }
   };
   $("#msubmit").onclick = modalSubmit;
 }
@@ -1511,8 +1730,11 @@ function summarize(d) {
   if (typeof d === "object") { const s = JSON.stringify(d); return s.length > 260 ? s.slice(0, 260) + "…" : s; }
   return String(d);
 }
-function confirmModal(title, detail, actionFn, onDone, verb) {
-  formModal(title, "confirm", [], actionFn, onDone, { note: detail, danger: 1, submitLabel: verb || "Confirm" });
+/* Danger is opt-in per call site now. When every confirm shows the same red
+   "double-check" banner, red stops meaning anything — pause/resume/run-now are
+   routine and get a plain consequence note; destructive ops pass {danger: 1}. */
+function confirmModal(title, detail, actionFn, onDone, verb, opts = {}) {
+  formModal(title, "confirm", [], actionFn, onDone, { note: detail, danger: opts.danger, submitLabel: verb || "Confirm" });
 }
 function closeModal() {
   const wrap = $("#modalwrap");
@@ -1974,7 +2196,7 @@ function unprovisionChat() {
     async () => {
       await Promise.all([loadList("messaging-groups", true), loadList("wirings", true)]);
       if (S.chat === c) { c.provisioned = false; c.session = null; c.messages = []; c.pending = []; c.sig = ""; renderChatLog(); updateChatBanner(); }
-    }, "Remove private line");
+    }, "Remove private line", { danger: 1 });
 }
 
 function autoGrow(ta) { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 140) + "px"; }
