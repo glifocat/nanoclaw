@@ -1,0 +1,2052 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>NanoClaw Operator</title>
+<style>
+/* ================= tokens ================= */
+:root {
+  color-scheme: dark;
+  --bg: oklch(0.155 0 0);
+  --surface: oklch(0.205 0 0);
+  --surface2: oklch(0.25 0 0);
+  --line: oklch(0.30 0 0);
+  --line-strong: oklch(0.38 0 0);
+  --ink: oklch(0.93 0.004 180);
+  --muted: oklch(0.72 0.012 190);
+  --faint: oklch(0.62 0.01 190);
+  --brand: oklch(0.80 0.11 180);          /* interactive teal (text/links/selection) */
+  --brand-fill: oklch(0.50 0.10 180);     /* filled controls, white ink on top */
+  --brand-fill-ink: #fff;
+  --coral: oklch(0.78 0.13 35);           /* playful accent */
+  --ok: oklch(0.80 0.16 150);
+  --warn: oklch(0.84 0.14 85);
+  --err: oklch(0.76 0.14 25);
+  --err-fill: oklch(0.50 0.16 27);
+  --edge-mention: oklch(0.80 0.11 180);
+  --edge-sticky: oklch(0.75 0.12 300);
+  --edge-pattern: oklch(0.80 0.16 150);
+  --edge-dest: oklch(0.84 0.14 85);
+  --edge-a2a: oklch(0.76 0.14 25);
+  --tint: 15%;
+  --shadow-1: 0 4px 18px rgb(0 0 0 / .35);
+  --shadow-2: 0 18px 60px rgb(0 0 0 / .5);
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px;
+  --z-nav: 30; --z-fab: 35; --z-overlay: 40; --z-drawer: 50; --z-modal: 60; --z-toast: 70; --z-login: 80;
+  --font: ui-rounded, "SF Pro Rounded", system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: oklch(0.965 0.004 190);
+  --surface2: oklch(0.935 0.006 190);
+  --line: oklch(0.90 0.006 190);
+  --line-strong: oklch(0.82 0.008 190);
+  --ink: oklch(0.25 0.02 220);
+  --muted: oklch(0.47 0.02 210);
+  --faint: oklch(0.55 0.02 210);
+  --brand: oklch(0.46 0.09 180);
+  --brand-fill: oklch(0.50 0.10 180);
+  --coral: oklch(0.50 0.15 32);
+  --ok: oklch(0.47 0.13 150);
+  --warn: oklch(0.49 0.11 75);
+  --err: oklch(0.50 0.17 27);
+  --edge-mention: oklch(0.46 0.09 180);
+  --edge-sticky: oklch(0.45 0.12 300);
+  --edge-pattern: oklch(0.47 0.13 150);
+  --edge-dest: oklch(0.55 0.12 75);
+  --edge-a2a: oklch(0.50 0.17 27);
+  --tint: 12%;
+  --shadow-1: 0 4px 18px rgb(23 36 40 / .10);
+  --shadow-2: 0 18px 60px rgb(23 36 40 / .18);
+}
+
+/* ================= base ================= */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body { min-height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--font); -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+a { color: var(--brand); }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+.ic { width: 18px; height: 18px; flex: none; vertical-align: -3px; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+input, select, textarea {
+  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line-strong);
+  border-radius: 10px; padding: 9px 12px; width: 100%; outline: none; min-height: 40px;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+::placeholder { color: var(--muted); opacity: 1; }
+@media (pointer: coarse) {
+  input, select, textarea { min-height: 46px; font-size: 16px; } /* 16px stops iOS zoom */
+}
+
+/* ================= buttons ================= */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 36px; padding: 7px 14px; border-radius: 10px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+  font-size: 13px; font-weight: 500; transition: border-color .15s, background .15s, transform .1s;
+}
+.btn:hover { border-color: var(--brand); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .55; cursor: default; transform: none; }
+.btn.pri { background: var(--brand-fill); border-color: var(--brand-fill); color: var(--brand-fill-ink); font-weight: 600; }
+.btn.pri:hover { filter: brightness(1.12); border-color: var(--brand-fill); }
+.btn.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 45%, var(--line)); background: transparent; }
+.btn.danger:hover { border-color: var(--err); background: color-mix(in srgb, var(--err) 8%, transparent); }
+.btn.danger-fill { background: var(--err-fill); border-color: var(--err-fill); color: #fff; font-weight: 600; }
+.btn.danger-fill:hover { filter: brightness(1.1); }
+.btn.sm { min-height: 30px; padding: 4px 10px; font-size: 12px; border-radius: 8px; }
+.btn.icon { padding: 7px; min-width: 36px; }
+.btn[hidden] { display: none; }
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .btn.sm { min-height: 40px; padding: 6px 12px; }
+  .btn.icon { min-width: 44px; }
+}
+
+/* ================= login ================= */
+#login { position: fixed; inset: 0; z-index: var(--z-login); display: flex; align-items: center; justify-content: center; background: var(--bg); padding: 20px; }
+#login .card { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 32px 28px; box-shadow: var(--shadow-2); }
+#login h1 { font-size: 20px; margin-bottom: 4px; }
+#login .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; text-wrap: pretty; }
+#login label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 12px 0 6px; }
+#login .err { color: var(--err); font-size: 12.5px; margin-top: 10px; min-height: 18px; }
+#login .tokrow { display: flex; gap: 8px; }
+#login .tokrow input { flex: 1; font-family: var(--mono); font-size: 13px; }
+.logo { display: flex; align-items: center; gap: 11px; }
+.logo .mark { width: 40px; height: 40px; border-radius: 13px; flex: none; background: var(--brand-fill); color: #fff; display: flex; align-items: center; justify-content: center; }
+.logo .mark .ic { width: 24px; height: 24px; }
+#login .logo { margin-bottom: 18px; }
+
+/* ================= app shell ================= */
+#app { display: none; }
+#app.on { display: block; }
+#side {
+  position: fixed; inset: 0 auto 0 0; width: 240px; z-index: var(--z-nav);
+  background: var(--surface); border-right: 1px solid var(--line);
+  padding: 16px 12px calc(12px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; overflow-y: auto;
+}
+#side .logo { padding: 2px 8px 14px; }
+#side .logo b { font-size: 15px; display: block; line-height: 1.2; }
+#side .logo span { font-size: 11.5px; color: var(--muted); }
+.nav-sec { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 16px 10px 6px; }
+.nav-it {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 8px 10px; border-radius: 10px; color: var(--muted); font-size: 13.5px; font-weight: 500;
+  transition: background .15s, color .15s;
+}
+.nav-it:hover { background: var(--surface2); color: var(--ink); }
+.nav-it[aria-current="page"] { background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand); font-weight: 600; }
+.nav-it .ic { opacity: .9; }
+.badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--err-fill); color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+#side .foot { margin-top: auto; padding: 12px 8px 0; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 8px; }
+#side .foot .row { display: flex; align-items: center; gap: 6px; }
+#side .foot .btn.sm { color: var(--muted); }
+#side .foot .btn.sm:hover { color: var(--ink); }
+
+#topbar { display: none; }
+#bottomnav { display: none; }
+#fab { display: none; }
+
+#main { margin-left: 240px; padding: 24px 32px 80px; max-width: 1360px; }
+
+/* -------- mobile shell -------- */
+@media (max-width: 899px) {
+  #side { display: none; }
+  #topbar {
+    display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: var(--z-nav);
+    background: var(--surface); border-bottom: 1px solid var(--line);
+    padding: calc(8px + env(safe-area-inset-top)) 14px 8px; min-height: 56px;
+  }
+  #topbar .logo .mark { width: 32px; height: 32px; border-radius: 10px; }
+  #topbar .logo .mark .ic { width: 19px; height: 19px; }
+  #topbar h1 { font-size: 16px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #bottomnav {
+    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-nav);
+    background: var(--surface); border-top: 1px solid var(--line);
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+  }
+  .bnav-it { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; min-height: 52px; border-radius: 12px; color: var(--muted); font-size: 10.5px; font-weight: 600; position: relative; }
+  .bnav-it .ic { width: 22px; height: 22px; }
+  .bnav-it[aria-current="page"] { color: var(--brand); }
+  .bnav-it .badge { position: absolute; top: 2px; left: calc(50% + 6px); margin: 0; }
+  #main { margin-left: 0; padding: 16px 14px calc(96px + env(safe-area-inset-bottom)); }
+  #fab {
+    display: flex; align-items: center; justify-content: center; position: fixed; z-index: var(--z-fab);
+    right: 16px; bottom: calc(78px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 18px;
+    background: var(--brand-fill); color: #fff; box-shadow: var(--shadow-2);
+  }
+  #fab .ic { width: 26px; height: 26px; }
+  #fab[hidden] { display: none; }
+}
+
+/* ================= page head ================= */
+.pagehead { margin-bottom: 16px; }
+.pagehead .toprow { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pagehead h2 { font-size: 19px; font-weight: 700; }
+.pagehead .count { color: var(--muted); font-size: 12.5px; }
+.pagehead .desc { color: var(--muted); font-size: 12.5px; margin-top: 3px; max-width: 72ch; text-wrap: pretty; }
+.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.toolbar .search { flex: 0 1 260px; min-width: 150px; position: relative; }
+.toolbar .search input { padding-left: 34px; }
+.toolbar .search .ic { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.spacer { flex: 1; }
+#sortsel { display: none; width: auto; }
+@media (max-width: 899px) {
+  .toolbar .search { flex: 1 1 100%; }
+  #sortsel { display: block; flex: 1; }
+  .only-desktop { display: none !important; }
+}
+
+.live {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border-radius: 999px;
+  border: 1px solid var(--line-strong); color: var(--muted); font-size: 12px; font-weight: 600;
+}
+.live .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--faint); }
+.live[aria-checked="true"] { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.live[aria-checked="true"] .dot { background: var(--ok); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (pointer: coarse) { .live { min-height: 44px; } }
+
+/* ================= table / cards ================= */
+.tablewrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); overflow-x: auto; }
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data th { text-align: left; padding: 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.data th button {
+  display: inline-flex; align-items: center; gap: 5px; width: 100%; padding: 11px 14px;
+  font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+}
+.data th button:hover { color: var(--ink); }
+.data th .arrow { font-size: 9px; }
+.data td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.data tr:last-child td { border-bottom: none; }
+.data tbody tr { cursor: pointer; }
+.data tbody tr:hover, .data tbody tr:focus-visible { background: var(--surface2); }
+td .mono { color: var(--muted); }
+.chip { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; background: color-mix(in srgb, var(--muted) 14%, var(--surface)); font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.chip.ok   { color: var(--ok);   background: color-mix(in srgb, var(--ok) var(--tint), var(--surface)); }
+.chip.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) var(--tint), var(--surface)); }
+.chip.err  { color: var(--err);  background: color-mix(in srgb, var(--err) var(--tint), var(--surface)); }
+.chip.acc  { color: var(--brand); background: color-mix(in srgb, var(--brand) var(--tint), var(--surface)); }
+.count { color: var(--muted); font-size: 12px; }
+.actions-cell { white-space: nowrap; }
+.actions-cell .btn { margin: 1px 2px; }
+
+/* cards on small screens */
+@media (max-width: 699px) {
+  .tablewrap { background: none; border: none; border-radius: 0; overflow: visible; }
+  .data, .data tbody { display: block; }
+  .data thead { display: none; }
+  .data tbody tr {
+    display: block; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+    margin-bottom: 10px; padding: 12px 14px; overflow-wrap: anywhere;
+  }
+  .data td > * { min-width: 0; }
+  .data td { display: flex; gap: 10px; padding: 4px 0; border: none; align-items: baseline; }
+  .data td::before { content: attr(data-label); flex: 0 0 108px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .data td.c-title { display: block; font-size: 15px; padding-bottom: 6px; }
+  .data td.c-title::before { display: none; }
+  .data td.actions-cell { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px; white-space: normal; }
+  .data td.actions-cell::before { display: none; }
+  .data td.actions-cell .btn { margin: 0; }
+}
+
+/* ================= empty & skeleton ================= */
+.empty { padding: 44px 20px; text-align: center; }
+.empty .eico { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 18px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--coral) 14%, var(--surface)); color: var(--coral); }
+.empty .eico .ic { width: 28px; height: 28px; }
+.empty .t { font-weight: 700; font-size: 14.5px; }
+.empty .h { color: var(--muted); font-size: 12.5px; margin-top: 4px; max-width: 42ch; margin-inline: auto; text-wrap: pretty; }
+.empty .btn { margin-top: 14px; }
+.skel { display: block; height: 13px; border-radius: 6px; background: var(--surface2); animation: shimmer 1.4s ease-in-out infinite; }
+@keyframes shimmer { 50% { opacity: .45; } }
+
+/* ================= overview ================= */
+.hello { margin-bottom: 18px; }
+.hello h2 { font-size: 22px; font-weight: 800; letter-spacing: -.01em; text-wrap: balance; }
+.hello .sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+.healthrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+@media (max-width: 699px) { .healthrow { grid-template-columns: 1fr; } }
+.health {
+  display: flex; align-items: center; gap: 14px; text-align: left;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px;
+  transition: border-color .15s;
+}
+.health:hover { border-color: var(--brand); }
+.health .hico { width: 42px; height: 42px; border-radius: 14px; flex: none; display: flex; align-items: center; justify-content: center; }
+.health .hico .ic { width: 22px; height: 22px; }
+.health.calm .hico { background: color-mix(in srgb, var(--brand) 14%, var(--surface)); color: var(--brand); }
+.health.good .hico { background: color-mix(in srgb, var(--ok) var(--tint), var(--surface)); color: var(--ok); }
+.health.attn .hico { background: color-mix(in srgb, var(--warn) var(--tint), var(--surface)); color: var(--warn); }
+.health.bad .hico { background: color-mix(in srgb, var(--err) var(--tint), var(--surface)); color: var(--err); }
+.health .hn { font-size: 21px; font-weight: 800; line-height: 1.1; }
+.health .hl { font-size: 12.5px; color: var(--muted); }
+.twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 1100px) { .twocol { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.panel h3 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.panel h3 .ic { color: var(--muted); }
+.panel h3 a { margin-left: auto; font-size: 12px; font-weight: 600; text-decoration: none; }
+.panel .body { padding: 4px 0 6px; }
+.panel .pempty { padding: 18px 16px; color: var(--muted); font-size: 12.5px; text-align: center; }
+.listrow { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 13px; min-height: 40px; }
+.listrow + .listrow { border-top: 1px solid var(--line); }
+.listrow .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.listrow .sub { color: var(--muted); font-size: 12px; }
+@media (max-width: 699px) {
+  .listrow .grow { white-space: normal; overflow-wrap: anywhere; }
+}
+.invrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 4px 13px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; font-weight: 600;
+}
+.pill b { color: var(--ink); }
+.pill:hover { border-color: var(--brand); color: var(--ink); }
+@media (pointer: coarse) { .pill { min-height: 44px; } }
+
+/* ================= drawer / sheet ================= */
+#overlay { position: fixed; inset: 0; background: rgb(0 0 0 / .5); z-index: var(--z-overlay); display: none; }
+#overlay.on { display: block; }
+#drawer {
+  position: fixed; z-index: var(--z-drawer); background: var(--surface); display: flex; flex-direction: column;
+  top: 0; right: 0; bottom: 0; width: min(620px, 96vw);
+  border-left: 1px solid var(--line); box-shadow: var(--shadow-2);
+  transform: translateX(105%); transition: transform .22s cubic-bezier(.25,1,.5,1); visibility: hidden;
+}
+#drawer.on { transform: none; visibility: visible; }
+#drawer .grab { display: none; }
+.dhead { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.dhead h3 { font-size: 15px; }
+.dhead .sub { font-size: 11.5px; color: var(--muted); word-break: break-all; }
+.dbody { flex: 1; overflow-y: auto; padding: 18px 20px calc(28px + env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+@media (max-width: 699px) {
+  #drawer {
+    top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: 88dvh; height: auto;
+    border-left: none; border-top: 1px solid var(--line); border-radius: var(--r-xl) var(--r-xl) 0 0;
+    transform: translateY(105%);
+  }
+  #drawer .grab { display: block; width: 40px; height: 4px; border-radius: 999px; background: var(--line-strong); margin: 10px auto 0; flex: none; }
+  .dhead { padding: 10px 16px 12px; }
+  .dbody { padding: 14px 16px calc(28px + env(safe-area-inset-bottom)); }
+}
+.kv { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+.kv td { padding: 8px 8px; border-bottom: 1px solid var(--line); font-size: 12.5px; vertical-align: top; }
+.kv td:first-child { color: var(--muted); width: 190px; white-space: nowrap; }
+.kv td.copyable { cursor: copy; word-break: break-all; white-space: pre-wrap; }
+@media (max-width: 699px) {
+  .kv, .kv tbody, .kv tr, .kv td { display: block; width: 100%; overflow-wrap: anywhere; }
+  .kv td { border-bottom: none; padding: 1px 0; }
+  .kv td:first-child { padding-top: 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .kv tr { border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+}
+.dsec { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 20px 0 8px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+.note { font-size: 12.5px; color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 30%, var(--line)); border-radius: 10px; padding: 9px 12px; margin: 8px 0; display: flex; gap: 8px; align-items: flex-start; }
+.note .ic { flex: none; margin-top: 1px; }
+
+/* ================= modal ================= */
+#modalwrap { position: fixed; inset: 0; z-index: var(--z-modal); display: none; align-items: center; justify-content: center; background: rgb(0 0 0 / .55); padding: 16px; }
+#modalwrap.on { display: flex; }
+#modal { width: min(520px, 100%); max-height: 88dvh; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 22px 24px; overscroll-behavior: contain; }
+#modal h3 { font-size: 16px; margin-bottom: 4px; }
+#modal .msub { color: var(--muted); font-size: 12px; margin-bottom: 14px; font-family: var(--mono); }
+@media (max-width: 699px) {
+  #modalwrap { align-items: flex-end; padding: 0; }
+  #modal { width: 100%; border-radius: var(--r-xl) var(--r-xl) 0 0; border-bottom: none; padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); }
+}
+.ffield { margin-bottom: 14px; }
+.ffield > label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+.ffield label b.req { color: var(--err); }
+.ffield .help { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+.fbtns { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
+@media (max-width: 699px) { .fbtns .btn { flex: 1; } }
+.confirm-danger {
+  color: var(--err); font-size: 13px; font-weight: 600;
+  background: color-mix(in srgb, var(--err) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--err) 35%, var(--line));
+  border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; display: flex; gap: 8px; align-items: flex-start;
+}
+.confirm-danger .ic { flex: none; margin-top: 1px; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); cursor: pointer; user-select: none; min-height: 32px; }
+.toggle input { width: 18px; height: 18px; min-height: 0; accent-color: var(--brand-fill); }
+
+/* ================= more sheet (mobile nav) ================= */
+#moresheet {
+  position: fixed; z-index: var(--z-drawer); left: 0; right: 0; bottom: 0; background: var(--surface);
+  border-top: 1px solid var(--line); border-radius: var(--r-xl) var(--r-xl) 0 0; box-shadow: var(--shadow-2);
+  transform: translateY(105%); transition: transform .22s cubic-bezier(.25,1,.5,1); visibility: hidden;
+  max-height: 85dvh; overflow-y: auto; padding: 8px 12px calc(16px + env(safe-area-inset-bottom)); overscroll-behavior: contain;
+}
+#moresheet.on { transform: none; visibility: visible; }
+#moresheet .grab { width: 40px; height: 4px; border-radius: 999px; background: var(--line-strong); margin: 6px auto 4px; }
+#moresheet .nav-it { min-height: 48px; font-size: 14.5px; }
+#moresheet .foot { display: flex; gap: 8px; padding: 12px 10px 0; border-top: 1px solid var(--line); margin-top: 10px; align-items: center; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+
+/* ================= toasts ================= */
+#toasts { position: fixed; z-index: var(--z-toast); display: flex; flex-direction: column; gap: 9px; bottom: 18px; right: 18px; max-width: min(440px, calc(100vw - 32px)); }
+@media (max-width: 699px) {
+  #toasts { top: calc(64px + env(safe-area-inset-top)); bottom: auto; left: 12px; right: 12px; max-width: none; }
+}
+.toast {
+  display: flex; gap: 10px; align-items: flex-start; background: var(--surface2); border: 1px solid var(--line-strong);
+  border-radius: var(--r-md); padding: 11px 14px; font-size: 12.5px; box-shadow: var(--shadow-1);
+  animation: toast-in .2s cubic-bezier(.25,1,.5,1); cursor: pointer;
+}
+.toast .tico { width: 26px; height: 26px; border-radius: 9px; flex: none; display: flex; align-items: center; justify-content: center; }
+.toast .tico .ic { width: 15px; height: 15px; }
+.toast.ok .tico { background: color-mix(in srgb, var(--ok) var(--tint), var(--surface2)); color: var(--ok); }
+.toast.err .tico { background: color-mix(in srgb, var(--err) var(--tint), var(--surface2)); color: var(--err); }
+.toast .t { font-weight: 700; }
+.toast .cmd { font-family: var(--mono); font-size: 11px; color: var(--muted); word-break: break-all; margin-top: 3px; }
+@keyframes toast-in { from { transform: translateY(10px); opacity: 0; } }
+
+/* ================= topology ================= */
+#topo { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); }
+#topo .canvas { overflow: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+#topo svg { display: block; }
+.tnode { cursor: pointer; }
+.tnode rect { fill: var(--surface2); stroke: var(--line-strong); }
+.tnode:hover rect, .tnode:focus rect { stroke: var(--brand); stroke-width: 1.6; }
+.tnode text { fill: var(--ink); font-size: 12px; font-family: var(--font); font-weight: 600; }
+.tnode .sub { fill: var(--muted); font-size: 10px; font-weight: 400; }
+.tedge { fill: none; stroke-width: 1.7; opacity: .8; pointer-events: none; }
+.thit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
+.thit:hover + .tedge, .thit:focus + .tedge { stroke-width: 3; opacity: 1; }
+.colhead { fill: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-family: var(--font); font-weight: 700; }
+.topo-tools { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.legend { display: flex; gap: 14px 18px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.legend i { display: inline-block; width: 20px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+/* ================= chat ================= */
+.chatpick { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.agentcard {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 7px; text-align: left;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 14px 16px; min-height: 44px; transition: border-color .15s, transform .1s;
+}
+.agentcard:hover { border-color: var(--brand); }
+.agentcard:active { transform: translateY(1px); }
+.agentcard .aico { width: 34px; height: 34px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--brand) 14%, var(--surface)); color: var(--brand); }
+.agentcard .an { font-size: 14.5px; font-weight: 700; }
+.agentcard .af { font-size: 11.5px; color: var(--muted); font-family: var(--mono); overflow-wrap: anywhere; }
+.chatwrap { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; height: calc(100dvh - 120px); min-height: 420px; max-width: 920px; }
+.chathead { display: flex; align-items: center; gap: 9px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.chathead .who { min-width: 0; flex: 1; }
+.chathead .who b { display: block; font-size: 14px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chathead .who .sub { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chathead select { width: auto; max-width: 200px; min-height: 36px; padding: 5px 8px; font-size: 12px; }
+.chatbanner { display: none; padding: 8px 14px; font-size: 12px; border-bottom: 1px solid var(--line); }
+.chatbanner.on { display: flex; gap: 8px; align-items: flex-start; }
+.chatbanner.on .ic { flex: none; margin-top: 1px; }
+.chatbanner.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); }
+.chatbanner.err { color: var(--err); background: color-mix(in srgb, var(--err) 10%, var(--surface)); }
+.chatlog { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 16px 14px; display: flex; flex-direction: column; background: var(--bg); }
+.msg { display: flex; flex-direction: column; align-items: flex-start; margin: 3px 0; }
+.msg .bub { max-width: min(78%, 580px); padding: 8px 13px; border-radius: 16px; border-bottom-left-radius: 6px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface2); }
+.msg .mt { font-size: 10.5px; color: var(--faint); margin: 3px 6px 0; }
+.msg .ms { font-size: 10.5px; font-weight: 700; color: var(--coral); margin: 0 6px 2px; }
+.msg .mis { font-size: 10.5px; color: var(--warn); margin: 2px 6px 0; }
+.msg.op { align-items: flex-end; }
+.msg.op .bub { background: var(--brand-fill); color: var(--brand-fill-ink); border-radius: 16px; border-bottom-right-radius: 6px; }
+.msg.us .bub { background: color-mix(in srgb, var(--coral) 14%, var(--surface2)); }
+.msg.pending .bub { opacity: .6; }
+.typing .bub { display: inline-flex; gap: 4px; padding: 13px 14px; }
+.typing .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--muted); animation: tdot 1.2s ease-in-out infinite; }
+.typing .dot:nth-child(2) { animation-delay: .15s; }
+.typing .dot:nth-child(3) { animation-delay: .3s; }
+@keyframes tdot { 30% { transform: translateY(-4px); opacity: .5; } }
+.daysep { align-self: center; font-size: 11px; font-weight: 700; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 12px; margin: 10px 0 6px; }
+.composer { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--surface); }
+.composer textarea { flex: 1; resize: none; min-height: 40px; max-height: 140px; border-radius: 14px; }
+.composer .btn.pri { min-width: 44px; min-height: 44px; border-radius: 14px; flex: none; padding: 0; }
+.chatsetup { margin: auto; max-width: 420px; text-align: center; padding: 24px 16px; }
+.chatsetup .h { color: var(--muted); font-size: 12.5px; margin: 6px 0 14px; text-wrap: pretty; }
+.chatsetup .eico { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 18px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--coral) 14%, var(--surface)); color: var(--coral); }
+.chatsetup .eico .ic { width: 28px; height: 28px; }
+@media (max-width: 899px) {
+  .chatwrap.full { position: fixed; inset: 0 0 var(--kb, 0px) 0; z-index: 45; border: none; border-radius: 0; height: auto; min-height: 0; max-width: none; }
+  .chatwrap.full .chathead { padding-top: calc(8px + env(safe-area-inset-top)); }
+  .chatwrap.full .composer { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .composer textarea { font-size: 16px; } /* 16px stops iOS zoom */
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="i-paw"><g fill="currentColor" stroke="none"><ellipse cx="7.2" cy="7.8" rx="1.9" ry="2.4"/><ellipse cx="12" cy="6.4" rx="1.9" ry="2.4"/><ellipse cx="16.8" cy="7.8" rx="1.9" ry="2.4"/><path d="M12 10.2c-3.1 0-5.8 2.5-5.8 5.1 0 1.6 1.2 2.7 2.8 2.7 1.1 0 2-.5 3-.5s1.9.5 3 .5c1.6 0 2.8-1.1 2.8-2.7 0-2.6-2.7-5.1-5.8-5.1z"/></g></g>
+    <g id="i-home"><path d="M4 11l8-7 8 7M6 9.5V19a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1V9.5"/></g>
+    <g id="i-graph"><circle cx="5.5" cy="6" r="2.2"/><circle cx="5.5" cy="18" r="2.2"/><circle cx="18.5" cy="12" r="2.2"/><path d="M7.6 6.8l8.8 4.2M7.6 17.2l8.8-4.2"/></g>
+    <g id="i-bot"><rect x="5" y="8" width="14" height="10" rx="3"/><path d="M12 8V5M12 5h.01"/><circle cx="12" cy="4.4" r="1"/><path d="M9.2 12.5v1.4M14.8 12.5v1.4"/></g>
+    <g id="i-chat"><path d="M20 12a8 8 0 1 0-3.2 6.4L20 19.5l-.8-3A7.9 7.9 0 0 0 20 12z"/></g>
+    <g id="i-link"><path d="M9.5 14.5l5-5M8 11l-2.4 2.4a3.5 3.5 0 0 0 5 5L13 16M11 8l2.4-2.4a3.5 3.5 0 0 1 5 5L16 13"/></g>
+    <g id="i-send"><path d="M20 4L4 10.8l6 2.4 2.4 6L20 4z"/><path d="M10 13.2L20 4"/></g>
+    <g id="i-zap"><path d="M13 3L5 13.5h5.5L11 21l8-10.5h-5.5L13 3z"/></g>
+    <g id="i-check-c"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></g>
+    <g id="i-drop"><path d="M20 12a8 8 0 1 0-3.2 6.4L20 19.5l-.8-3A7.9 7.9 0 0 0 20 12z"/><path d="M9.7 9.7l4.6 4.6M14.3 9.7l-4.6 4.6"/></g>
+    <g id="i-user"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 19.5c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5"/></g>
+    <g id="i-shield"><path d="M12 3.5l7 2.6v5.2c0 4.3-2.9 7.4-7 9.2-4.1-1.8-7-4.9-7-9.2V6.1l7-2.6z"/></g>
+    <g id="i-users"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.7-3 3-4.4 5.5-4.4S13.8 16 14.5 19M15.5 6.2a3 3 0 0 1 0 5.6M17 14.9c1.8.5 3 1.8 3.5 4.1"/></g>
+    <g id="i-swap"><path d="M4 8.5h13M14 5l3.5 3.5L14 12M20 15.5H7M10 12l-3.5 3.5L10 19"/></g>
+    <g id="i-mail"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M4.5 7.5l7.5 5.5 7.5-5.5"/></g>
+    <g id="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M18.5 5.5l-1.4 1.4M6.9 17.1l-1.4 1.4"/></g>
+    <g id="i-moon"><path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5z"/></g>
+    <g id="i-lock"><rect x="5.5" y="10.5" width="13" height="9" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></g>
+    <g id="i-x"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></g>
+    <g id="i-plus"><path d="M12 5.5v13M5.5 12h13"/></g>
+    <g id="i-refresh"><path d="M19 12a7 7 0 1 1-2-4.9M19 4v3.5h-3.5"/></g>
+    <g id="i-search"><circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L20 20"/></g>
+    <g id="i-more"><circle cx="5.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.4" fill="currentColor" stroke="none"/></g>
+    <g id="i-alert"><path d="M12 4L2.8 19.5h18.4L12 4z"/><path d="M12 10v4.2M12 17.2h.01"/></g>
+    <g id="i-zoom-in"><circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L20 20M11 8.5v5M8.5 11h5"/></g>
+    <g id="i-zoom-out"><circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L20 20M8.5 11h5"/></g>
+    <g id="i-eye"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></g>
+    <g id="i-sparkle"><path d="M12 4l1.6 4.9L18.5 10l-4.9 1.6L12 16.5l-1.6-4.9L5.5 10l4.9-1.1L12 4z"/><path d="M18.5 15.5l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7.7-2.1z"/></g>
+    <g id="i-back"><path d="M14.5 5.5L8 12l6.5 6.5"/></g>
+    <g id="i-unplug"><path d="M9 8.5V5M15 8.5V5M7.5 8.5h9v3a4.5 4.5 0 0 1-9 0v-3zM12 16v4M4.5 19.5L19.5 4.5"/></g>
+  </defs>
+</svg>
+
+<div id="login">
+  <div class="card">
+    <div class="logo">
+      <div class="mark"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#i-paw"/></svg></div>
+      <div><h1>NanoClaw Operator</h1></div>
+    </div>
+    <div class="sub">Hi! This is the control room for your agent fleet. Paste the access token from <code>dashboard/.token</code> on the host to come in.</div>
+    <label for="tok">Access token</label>
+    <div class="tokrow">
+      <input id="tok" type="password" placeholder="64-char hex token" autocomplete="current-password">
+      <button class="btn icon" type="button" onclick="toggleTokenVis()" aria-label="Show or hide token"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye"/></svg></button>
+    </div>
+    <div class="err" id="loginerr" role="alert"></div>
+    <button class="btn pri" style="width:100%;margin-top:8px" onclick="doLogin()">Unlock dashboard</button>
+  </div>
+</div>
+
+<div id="app">
+  <nav id="side" aria-label="Main navigation">
+    <div class="logo">
+      <div class="mark"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#i-paw"/></svg></div>
+      <div><b>NanoClaw</b><span>operator console</span></div>
+    </div>
+    <div id="nav"></div>
+    <div class="foot">
+      <div class="row mono" id="conninfo"></div>
+      <div class="row">
+        <button class="btn sm icon" id="themebtn" onclick="toggleTheme()" aria-label="Toggle theme"></button>
+        <button class="btn sm" onclick="logout()"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#i-lock"/></svg> Lock</button>
+      </div>
+    </div>
+  </nav>
+
+  <header id="topbar">
+    <div class="logo"><div class="mark"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#i-paw"/></svg></div></div>
+    <h1 id="tb-title">Overview</h1>
+    <button class="btn icon sm" id="themebtn2" onclick="toggleTheme()" aria-label="Toggle theme"></button>
+  </header>
+
+  <main id="main"></main>
+
+  <button id="fab" hidden onclick="openCreate(S.page)" aria-label="Create">
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-plus"/></svg>
+  </button>
+
+  <nav id="bottomnav" aria-label="Primary"></nav>
+</div>
+
+<div id="overlay" onclick="closeAllLayers()"></div>
+<aside id="drawer" role="dialog" aria-modal="true" aria-label="Details"></aside>
+<div id="moresheet" role="dialog" aria-modal="true" aria-label="All sections"></div>
+<div id="modalwrap"><div id="modal" role="dialog" aria-modal="true"></div></div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* =============================== state =============================== */
+const S = {
+  token: localStorage.getItem("ncl_dash_token") || "",
+  page: "overview",
+  cache: {},
+  rendered: [],
+  filter: "",
+  sort: {},
+  autoTimer: null,
+  auto: JSON.parse(localStorage.getItem("ncl_dash_auto") || "true"),
+  topoZoom: 1,
+  cfgCtx: null,
+  lastFocus: null,
+  chat: null,
+  chatTimer: null,
+};
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const ico = (name, cls) => `<svg class="ic ${cls || ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+
+/* =============================== api ================================= */
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    ...opts,
+    headers: { "Authorization": "Bearer " + S.token, "Content-Type": "application/json", ...(opts.headers || {}) },
+  });
+  if (r.status === 401) { logout(); throw new Error("unauthorized"); }
+  return r.json();
+}
+async function ncl(resource, verb, args = {}) {
+  return api("/api/ncl", { method: "POST", body: JSON.stringify({ resource, verb, args }) });
+}
+async function loadList(resource, force = false) {
+  if (!force && S.cache[resource]) return S.cache[resource];
+  const res = await ncl(resource, "list");
+  if (!res.ok) { toast(false, `Couldn't load ${resource}`, res.error?.message, res.cmd); return S.cache[resource] || []; }
+  S.cache[resource] = Array.isArray(res.data) ? res.data : [];
+  if (resource === "approvals") updateBadges();
+  return S.cache[resource];
+}
+function pendingApprovals() { return (S.cache.approvals || []).filter(a => a.status === "pending").length; }
+function updateBadges() {
+  const n = pendingApprovals();
+  document.querySelectorAll("[data-badge=approvals]").forEach(el => {
+    el.innerHTML = n ? `<span class="badge" aria-label="${n} pending">${n}</span>` : "";
+  });
+}
+
+/* ============================ auth / theme =========================== */
+async function doLogin() {
+  const t = $("#tok").value.trim();
+  if (!t) { $("#loginerr").textContent = "Paste the token first — it's in dashboard/.token."; return; }
+  S.token = t;
+  try {
+    const r = await fetch("/api/health", { headers: { Authorization: "Bearer " + t } });
+    if (r.status === 401) { $("#loginerr").textContent = "That token didn't match. Check dashboard/.token on the host."; return; }
+    const j = await r.json();
+    localStorage.setItem("ncl_dash_token", t);
+    $("#login").style.display = "none";
+    $("#app").classList.add("on");
+    $("#conninfo").textContent = `${j.data.host}:${j.data.port}`;
+    nav(S.page);
+  } catch { $("#loginerr").textContent = "Can't reach the server. Is the tailnet up?"; }
+}
+function logout() {
+  localStorage.removeItem("ncl_dash_token"); S.token = "";
+  closeAllLayers(); clearInterval(S.autoTimer); stopChatPoll();
+  $("#app").classList.remove("on"); $("#login").style.display = "flex"; $("#loginerr").textContent = "";
+}
+function toggleTokenVis() {
+  const i = $("#tok"); i.type = i.type === "password" ? "text" : "password"; i.focus();
+}
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  const icon = t === "light" ? "moon" : "sun";
+  const label = t === "light" ? "Switch to dark theme" : "Switch to light theme";
+  for (const id of ["#themebtn", "#themebtn2"]) {
+    const b = $(id); if (b) { b.innerHTML = ico(icon); b.setAttribute("aria-label", label); }
+  }
+}
+function toggleTheme() {
+  const t = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  localStorage.setItem("ncl_dash_theme", t);
+  applyTheme(t);
+}
+
+/* =============================== toasts ============================== */
+function toast(ok, title, msg, cmd) {
+  const el = document.createElement("div");
+  el.className = "toast " + (ok ? "ok" : "err");
+  el.innerHTML = `<div class="tico">${ico(ok ? "check-c" : "alert")}</div><div>
+    <div class="t">${esc(title)}</div>` +
+    (msg ? `<div>${esc(String(msg).slice(0, 400))}</div>` : "") +
+    (cmd ? `<div class="cmd">${esc(cmd)}</div>` : "") + `</div>`;
+  el.onclick = () => el.remove();
+  $("#toasts").appendChild(el);
+  setTimeout(() => el.remove(), ok ? 6000 : 14000);
+}
+
+/* ========================= resource registry ========================= */
+/* Flag-name convention (deliberate, matches ncl — do NOT "unify"):
+   default CRUD verbs (create/update/get/delete) take the kebab-cased Fields
+   names (channel-type, agent-group-id, display-name, …) with `id` for row
+   identity, while the custom mutation verbs take their verb-description
+   names — roles grant/revoke {user, role, group}, members add/remove
+   {user, group}, policies set/remove {from, to, approver}, destinations
+   add/remove {agent-group-id, local-name}. Renaming either side breaks the
+   corresponding ncl calls. */
+const ENGAGE = ["mention", "mention-sticky", "pattern"];
+const agOpts = () => (S.cache.groups || []).map(g => ({ v: g.id, l: `${g.name} (${g.id})` }));
+const mgOpts = () => (S.cache["messaging-groups"] || []).map(m => ({ v: m.id, l: `${m.name || m.platform_id} [${m.channel_type}] (${m.id})` }));
+const userOpts = () => (S.cache.users || []).map(u => ({ v: u.id, l: `${u.display_name || ""} ${u.id}`.trim() }));
+const agName = id => { const g = (S.cache.groups || []).find(g => g.id === id); return g ? g.name : id; };
+const mgName = id => { const m = (S.cache["messaging-groups"] || []).find(m => m.id === id); return m ? (m.name || m.platform_id) : id; };
+
+function chip(v, cls, title) { return `<span class="chip ${cls || ""}"${title ? ` title="${esc(title)}"` : ""}>${esc(v)}</span>`; }
+function statusChip(v) {
+  const cls = { active: "ok", running: "ok", pending: "warn", closed: "err", expired: "err", approved: "ok", rejected: "err" }[v] || "";
+  return chip(v, cls);
+}
+/* friendly container status — raw value stays one hover/tap away */
+function containerChip(v) {
+  if (v === "running") return chip("awake", "ok", "container: running");
+  if (v === "stopped") return chip("napping", "", "container: stopped");
+  return statusChip(v || "—");
+}
+
+const REG = {
+  overview: { label: "Overview", icon: "home", custom: renderOverview, auto: 1 },
+  chat: { label: "Chat", icon: "chat", custom: renderChat, needs: ["groups", "messaging-groups", "wirings"] },
+  topology: { label: "Topology", icon: "graph", custom: renderTopology, needs: ["groups", "messaging-groups", "wirings", "destinations"] },
+
+  groups: {
+    label: "Agent Groups", icon: "bot", res: "groups",
+    desc: "Logical agent identities — each with its own workspace, container config and history.",
+    empty: { t: "No agent groups yet", h: "Create one to give your assistant a home to live in." },
+    needs: ["groups"],
+    cols: [
+      { k: "name", l: "Name", r: r => `<b>${esc(r.name)}</b>` },
+      { k: "folder", l: "Folder", r: r => `<span class="mono">${esc(r.folder)}</span>` },
+      { k: "id", l: "ID", r: r => `<span class="mono">${esc(r.id)}</span>` },
+      { k: "created_at", l: "Created", r: r => fmtDate(r.created_at) },
+    ],
+    create: { title: "New agent group", btn: "Create group", fields: [
+      { key: "name", label: "Name", help: "Display name (not necessarily unique). With a template, overrides the template's default name." },
+      { key: "folder", label: "Folder", help: "Directory under groups/ on the host. Unique, immutable. Required unless a template is given." },
+      { key: "template", label: "Template (optional)", help: "Template ref under templates/ to stamp from (persona, MCP servers, skills, paused recurring tasks). Makes Folder optional." },
+    ]},
+    rowActions: r => [
+      { l: "Edit", f: () => formModal("Edit agent group", `groups update`, [
+          { key: "name", label: "Name", req: 1, value: r.name },
+        ], vals => ncl("groups", "update", { id: r.id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
+      { l: "Restart…", f: () => restartGroupModal(r) },
+      { l: "Config", f: () => openGroupConfig(r) },
+      { l: "Delete", danger: 1, f: () => formModal(`Delete "${r.name}"?`, "groups delete", [
+          { key: "_confirm", label: `Type the group name (${r.name}) to confirm`, req: 1, expect: r.name },
+        ], () => ncl("groups", "delete", { id: r.id }), () => refresh(),
+        { submitLabel: "Delete group", danger: 1,
+          note: "Cascades: sessions, destinations, approvals, role grants, memberships and wirings for this group are deleted. Containers and on-disk files are not touched." }) },
+    ],
+  },
+
+  "messaging-groups": {
+    label: "Messaging Groups", icon: "chat", res: "messaging-groups",
+    desc: "One chat or channel on one platform. Identity = (channel_type, platform_id).",
+    empty: { t: "No chats registered", h: "Chats show up here when a channel adapter meets them — or add one by hand." },
+    needs: ["messaging-groups"],
+    cols: [
+      { k: "name", l: "Name", r: r => `<b>${esc(r.name || "—")}</b>` },
+      { k: "channel_type", l: "Channel", r: r => chip(r.channel_type, "acc") },
+      { k: "platform_id", l: "Platform ID", r: r => `<span class="mono">${esc(r.platform_id)}</span>` },
+      { k: "is_group", l: "Kind", r: r => r.is_group ? chip("group") : chip("DM") },
+      { k: "unknown_sender_policy", l: "Unknown sender", r: r => chip(r.unknown_sender_policy, r.unknown_sender_policy === "public" ? "warn" : "") },
+      { k: "id", l: "ID", r: r => `<span class="mono">${esc(r.id)}</span>` },
+    ],
+    create: { title: "New messaging group", btn: "Create messaging group", fields: [
+      { key: "channel-type", label: "Channel type", req: 1, help: "Adapter type: telegram, discord, slack, whatsapp, matrix, …" },
+      { key: "platform-id", label: "Platform ID", req: 1, help: "Chat ID / snowflake / phone / email — platform-specific." },
+      { key: "name", label: "Display name" },
+      { key: "instance", label: "Adapter instance", help: "Defaults to channel_type when omitted." },
+      { key: "is-group", label: "Multi-user group chat", type: "select", options: [{v:"0",l:"0 — direct message"},{v:"1",l:"1 — group chat"}] },
+      { key: "unknown-sender-policy", label: "Unknown sender policy", type: "select", options: ["strict","request_approval","public"].map(v=>({v,l:v})) },
+    ]},
+    rowActions: r => [
+      { l: "Edit", f: () => formModal("Edit messaging group", "messaging-groups update", [
+          { key: "name", label: "Display name", value: r.name || "" },
+          { key: "instance", label: "Adapter instance", value: r.instance || "" },
+          { key: "is-group", label: "Multi-user group chat", type: "select", value: String(r.is_group ?? 0), options: [{v:"0",l:"0 — direct message"},{v:"1",l:"1 — group chat"}] },
+          { key: "unknown-sender-policy", label: "Unknown sender policy", type: "select", value: r.unknown_sender_policy, options: ["strict","request_approval","public"].map(v=>({v,l:v})) },
+        ], vals => ncl("messaging-groups", "update", { id: r.id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
+      { l: "Send test", f: () => formModal(`Send into "${r.name || r.platform_id}"`, "messaging-groups send", [
+          { key: "text", label: "Message text", req: 1, type: "textarea" },
+          { key: "sender", label: "Sender label", help: 'Name the agent sees as the sender. Default "cli".' },
+          { key: "sender-id", label: "Sender ID", help: 'Namespaced id the access gate checks, e.g. "tg:123". Default "cli:local".' },
+        ], vals => ncl("messaging-groups", "send", { "channel-type": r.channel_type, "platform-id": r.platform_id, ...(r.instance ? { instance: r.instance } : {}), ...vals }), null,
+        { submitLabel: "Send message", note: "Routes through the live router as a real inbound message — the wired agent wakes and its reply goes to the real chat, not here." }) },
+      { l: "Delete", danger: 1, f: () => confirmModal(`Delete "${r.name || r.platform_id}"?`, "The chat is unregistered from routing. Its wirings stop working.",
+          () => ncl("messaging-groups", "delete", { id: r.id }), () => refresh(), "Delete messaging group") },
+    ],
+  },
+
+  wirings: {
+    label: "Wirings", icon: "link", res: "wirings",
+    desc: "Connects a messaging group to an agent group and defines when the agent engages.",
+    empty: { t: "Nothing wired up yet", h: "A wiring connects a chat to an agent so messages start flowing." },
+    needs: ["wirings", "groups", "messaging-groups"],
+    cols: [
+      { k: "messaging_group_id", l: "Messaging group", r: r => `<b>${esc(mgName(r.messaging_group_id))}</b><br><span class="mono count">${esc(r.messaging_group_id)}</span>` },
+      { k: "agent_group_id", l: "Agent group", r: r => `<b>${esc(agName(r.agent_group_id))}</b><br><span class="mono count">${esc(r.agent_group_id)}</span>` },
+      { k: "engage_mode", l: "Engage", r: r => chip(r.engage_mode, "acc") + (r.engage_pattern ? ` <span class="mono">${esc(r.engage_pattern)}</span>` : "") },
+      { k: "sender_scope", l: "Senders", r: r => chip(r.sender_scope) },
+      { k: "session_mode", l: "Session", r: r => chip(r.session_mode) },
+      { k: "ignored_message_policy", l: "Ignored msgs", r: r => chip(r.ignored_message_policy) },
+    ],
+    create: { title: "New wiring", btn: "Create wiring", fields: [
+      { key: "messaging-group-id", label: "Messaging group", req: 1, type: "select", optionsFn: mgOpts },
+      { key: "agent-group-id", label: "Agent group", req: 1, type: "select", optionsFn: agOpts },
+      { key: "engage-mode", label: "Engage mode", type: "select", options: ENGAGE.map(v=>({v,l:v})) },
+      { key: "engage-pattern", label: "Engage pattern (regex)", help: 'Required for engage-mode=pattern. Use "." for always-on.' },
+      { key: "sender-scope", label: "Sender scope", type: "select", options: ["all","known"].map(v=>({v,l:v})) },
+      { key: "ignored-message-policy", label: "Ignored message policy", type: "select", options: ["drop","accumulate"].map(v=>({v,l:v})) },
+      { key: "session-mode", label: "Session mode", type: "select", options: ["shared","per-thread","agent-shared"].map(v=>({v,l:v})) },
+      { key: "threads", label: "Threads override", type: "select", options: [{v:"",l:"— inherit channel default —"},{v:"true",l:"true — honor platform threads"},{v:"false",l:"false — disable threads"}] },
+      { key: "priority", label: "Priority", help: "Fanout order when multiple agents are wired to the same chat — higher first. Default 0." },
+    ], after: "A reply destination for the agent is created automatically with the wiring; rename it under Destinations if the auto-generated name is ambiguous." },
+    rowActions: r => [
+      { l: "Edit", f: () => formModal("Edit wiring", "wirings update", [
+          { key: "engage-mode", label: "Engage mode", type: "select", value: r.engage_mode, options: ENGAGE.map(v=>({v,l:v})) },
+          { key: "engage-pattern", label: "Engage pattern (regex)", value: r.engage_pattern || "" },
+          { key: "sender-scope", label: "Sender scope", type: "select", value: r.sender_scope, options: ["all","known"].map(v=>({v,l:v})) },
+          { key: "ignored-message-policy", label: "Ignored message policy", type: "select", value: r.ignored_message_policy, options: ["drop","accumulate"].map(v=>({v,l:v})) },
+          { key: "session-mode", label: "Session mode", type: "select", value: r.session_mode, options: ["shared","per-thread","agent-shared"].map(v=>({v,l:v})) },
+          { key: "threads", label: "Threads override", type: "select", value: r.threads == null ? "" : (r.threads ? "true" : "false"), options: [{v:"",l:"— unchanged (inherit) —"},{v:"true",l:"true — honor platform threads"},{v:"false",l:"false — disable threads"}], help: "Empty = leave unchanged; ncl has no flag to reset an override back to inherit." },
+          { key: "priority", label: "Priority", value: r.priority ?? "", help: "Fanout order — higher first." },
+        ], vals => ncl("wirings", "update", { id: r.id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
+      { l: "Delete", danger: 1, f: () => confirmModal("Delete this wiring?", `${mgName(r.messaging_group_id)} → ${agName(r.agent_group_id)} will stop routing.`,
+          () => ncl("wirings", "delete", { id: r.id }), () => refresh(), "Delete wiring") },
+    ],
+  },
+
+  destinations: {
+    label: "Destinations", icon: "send", res: "destinations",
+    desc: "Per-agent send ACL — a local name each agent uses to address a channel or another agent.",
+    empty: { t: "No destinations", h: "Agents can only speak where a destination allows them to." },
+    needs: ["destinations", "groups", "messaging-groups"],
+    cols: [
+      { k: "agent_group_id", l: "Agent", r: r => `<b>${esc(agName(r.agent_group_id))}</b>` },
+      { k: "local_name", l: "Local name", r: r => `<span class="mono">${esc(r.local_name)}</span>` },
+      { k: "target_type", l: "Type", r: r => chip(r.target_type, r.target_type === "agent" ? "acc" : "") },
+      { k: "target_id", l: "Target", r: r => `<b>${esc(r.target_type === "agent" ? agName(r.target_id) : mgName(r.target_id))}</b><br><span class="mono count">${esc(r.target_id)}</span>` },
+      { k: "created_at", l: "Created", r: r => fmtDate(r.created_at) },
+    ],
+    create: { title: "New destination", btn: "Add destination", verb: "add", fields: [
+      { key: "agent-group-id", label: "Agent group (owner)", req: 1, type: "select", optionsFn: agOpts },
+      { key: "local-name", label: "Local name", req: 1, help: "Lowercase, dash-separated; unique per agent." },
+      { key: "target-type", label: "Target type", req: 1, type: "select", options: [{v:"channel",l:"channel — messaging group"},{v:"agent",l:"agent — another agent group"}] },
+      { key: "target-id", label: "Target ID", req: 1, help: "messaging_groups.id for channel, agent_groups.id for agent." },
+    ]},
+    rowActions: r => [
+      { l: "Remove", danger: 1, f: () => confirmModal(`Remove destination "${r.local_name}"?`, `${agName(r.agent_group_id)} loses permission to send to this target.`,
+          () => ncl("destinations", "remove", { "agent-group-id": r.agent_group_id, "local-name": r.local_name }), () => refresh(), "Remove destination") },
+    ],
+  },
+
+  sessions: {
+    label: "Sessions", icon: "zap", res: "sessions", auto: 1,
+    desc: "Runtime units — one (agent group, messaging group, thread) per container.",
+    empty: { t: "No sessions yet", h: "A session appears the first time an agent wakes up for a chat." },
+    needs: ["sessions", "groups", "messaging-groups"],
+    cols: [
+      { k: "agent_group_id", l: "Agent", r: r => `<b>${esc(agName(r.agent_group_id))}</b>` },
+      { k: "messaging_group_id", l: "Messaging group", r: r => esc(r.messaging_group_id ? mgName(r.messaging_group_id) : "(agent-shared)") },
+      { k: "container_status", l: "Container", r: r => containerChip(r.container_status) },
+      { k: "status", l: "Status", r: r => statusChip(r.status) },
+      { k: "last_active", l: "Last active", r: r => fmtDate(r.last_active) },
+      { k: "id", l: "ID", r: r => `<span class="mono">${esc(r.id)}</span>` },
+    ],
+  },
+
+  tasks: {
+    label: "Tasks", icon: "refresh", res: "tasks",
+    desc: "Scheduled tasks per agent group — recurring (cron) series and one-shots, with per-series run history.",
+    empty: { t: "No live tasks", h: "Schedule a recurring series or a one-shot and the agent wakes on its own." },
+    needs: ["tasks", "groups"],
+    cols: [
+      { k: "series_id", l: "Task", r: r => `<b class="mono">${esc(r.series_id)}</b><br><span class="count">${esc(trunc(r.prompt || "", 60))}</span>` },
+      { k: "agent_group_id", l: "Agent", r: r => esc(agName(r.agent_group_id)) },
+      { k: "schedule", l: "Schedule", r: r => (r.recurrence ? `<span class="mono">${esc(r.recurrence)}</span>` : chip("once")) + (r.has_script ? " " + chip("script-gated", "acc") : "") },
+      { k: "status", l: "Status", r: r => r.status === "paused" ? chip("paused", "warn", "Paused — resume to re-arm (tasks auto-pause after 8 consecutive script failures).") : chip(r.status, "ok") },
+      { k: "runs", l: "Runs", r: r => `<b>${esc(r.runs ?? 0)}</b>` },
+      { k: "failed_runs", l: "Failed", r: r => +r.failed_runs ? chip(r.failed_runs, "err", "Failed fires — check the run log; a series auto-pauses after 8 consecutive failures.") : `<span class="count">0</span>` },
+      { k: "last_run", l: "Last run", r: r => fmtDate(r.last_run) },
+      { k: "next_run", l: "Next run", r: r => fmtDate(r.next_run) },
+    ],
+    create: { title: "New task", btn: "Create task", fields: [
+      { key: "group", label: "Agent group", req: 1, type: "select", optionsFn: agOpts },
+      { key: "prompt", label: "Prompt", req: 1, type: "textarea", help: "What the agent wakes to." },
+      { key: "name", label: "Name", help: "Short descriptive name → readable task id (<slug>-<hex>)." },
+      { key: "recurrence", label: "Recurrence (cron)", help: "Instance TZ. Omit for a one-shot. More than 4 fires/day is refused unless script-gated or overridden below." },
+      { key: "process-after", label: "First/next run time", help: "ISO 8601 or naive local. Required for one-shots; with a recurrence the first run derives from the cron grid." },
+      { key: "script", label: "Pre-task gate script (bash)", type: "textarea", help: 'Runs BEFORE the agent wakes: 30s timeout, 1MB output cap. Last stdout line must be JSON {"wakeAgent": bool, "data": {…}} — wakeAgent=false handles the run without waking the agent (zero tokens).' },
+      { key: "dangerously-override-recurrence-limit", label: "Allow more than 4 fires/day without a script gate", type: "checkbox" },
+    ]},
+    rowActions: r => [
+      { l: "Run now", f: () => confirmModal(`Run "${r.series_id}" now?`, "Queues an extra run due immediately. The schedule is untouched — it neither consumes a one-shot nor advances a recurring series.",
+          () => ncl("tasks", "run", { id: r.series_id, session: r.session_id }), () => refresh(), "Run now") },
+      r.status === "paused"
+        ? { l: "Resume", f: () => confirmModal(`Resume "${r.series_id}"?`, "The series re-arms and fires on its schedule again (this is the recovery step after the 8-failure auto-pause).",
+            () => ncl("tasks", "resume", { id: r.series_id, session: r.session_id }), () => refresh(), "Resume task") }
+        : { l: "Pause", f: () => confirmModal(`Pause "${r.series_id}"?`, "The series stops firing until you resume it. History is kept.",
+            () => ncl("tasks", "pause", { id: r.series_id, session: r.session_id }), () => refresh(), "Pause task") },
+      { l: "Edit", f: () => formModal("Edit task", "tasks update", [
+          { key: "prompt", label: "Prompt", type: "textarea", help: "Blank = keep the current prompt (the table shows a truncated preview — don't paste it back)." },
+          { key: "process-after", label: "Next run time", help: "ISO 8601 or naive local. Blank = unchanged." },
+          { key: "recurrence", label: "Recurrence (cron)", value: r.recurrence || "", help: 'Blank = unchanged; type "null" to clear (makes it a one-shot).' },
+          { key: "script", label: "Pre-task gate script (bash)", type: "textarea", help: 'Blank = unchanged; type "null" to remove the script.' },
+          { key: "dangerously-override-recurrence-limit", label: "Allow more than 4 fires/day without a script gate", type: "checkbox" },
+        ], vals => ncl("tasks", "update", { id: r.series_id, session: r.session_id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
+      { l: "Cancel", danger: 1, f: () => confirmModal(`Cancel "${r.series_id}"?`, "The live series stops for good (run history and log are kept). Use Delete to also remove history.",
+          () => ncl("tasks", "cancel", { id: r.series_id, session: r.session_id }), () => refresh(), "Cancel task") },
+      { l: "Delete", danger: 1, f: () => formModal(`Delete "${r.series_id}"?`, "tasks delete", [
+          { key: "_confirm", label: `Type the task id (${r.series_id}) to confirm`, req: 1, expect: r.series_id },
+        ], () => ncl("tasks", "delete", { id: r.series_id, session: r.session_id }), () => refresh(),
+        { submitLabel: "Delete task", danger: 1, note: "Hard-deletes the series AND its entire run history. Cancel instead if you want to keep the history." }) },
+    ],
+  },
+
+  users: {
+    label: "Users", icon: "user", res: "users",
+    desc: "Messaging-platform identities — one row per sender per channel.",
+    empty: { t: "No users yet", h: "Senders are registered here the first time they're seen." },
+    needs: ["users"],
+    cols: [
+      { k: "display_name", l: "Name", r: r => `<b>${esc(r.display_name || "—")}</b>` },
+      { k: "id", l: "ID", r: r => `<span class="mono">${esc(r.id)}</span>` },
+      { k: "kind", l: "Kind", r: r => chip(r.kind, "acc") },
+      { k: "created_at", l: "Created", r: r => fmtDate(r.created_at) },
+    ],
+    create: { title: "New user", btn: "Create user", fields: [
+      { key: "id", label: "ID", req: 1, help: 'Namespaced "channel:handle" — e.g. "tg:6037840640", "email:a@b.c".' },
+      { key: "kind", label: "Kind", req: 1, help: 'Channel type identifier, e.g. "telegram", "whatsapp".' },
+      { key: "display-name", label: "Display name" },
+    ]},
+    rowActions: r => [
+      { l: "Edit", f: () => formModal("Edit user", "users update", [
+          { key: "display-name", label: "Display name", value: r.display_name || "" },
+        ], vals => ncl("users", "update", { id: r.id, ...vals }), () => refresh(), { submitLabel: "Save changes" }) },
+    ],
+  },
+
+  roles: {
+    label: "Roles", icon: "shield", res: "roles",
+    desc: "Privilege grants. owner = global full control; admin can be global or scoped to one agent group.",
+    empty: { t: "No roles granted", h: "Grant admin or owner to the people you trust with the fleet." },
+    needs: ["roles", "users", "groups"],
+    cols: [
+      { k: "user_id", l: "User", r: r => `<span class="mono">${esc(r.user_id)}</span>` },
+      { k: "role", l: "Role", r: r => chip(r.role, r.role === "owner" ? "warn" : "acc") },
+      { k: "agent_group_id", l: "Scope", r: r => r.agent_group_id ? esc(agName(r.agent_group_id)) : chip("global") },
+      { k: "granted_at", l: "Granted", r: r => fmtDate(r.granted_at) },
+    ],
+    create: { title: "Grant role", btn: "Grant role", verb: "grant", fields: [
+      { key: "user", label: "User", req: 1, type: "select", optionsFn: userOpts },
+      { key: "role", label: "Role", req: 1, type: "select", options: [{v:"admin",l:"admin"},{v:"owner",l:"owner (always global)"}] },
+      { key: "group", label: "Scope to agent group (admin only)", type: "select", optionsFn: () => [{v:"",l:"— global —"}].concat(agOpts()) },
+    ]},
+    rowActions: r => [
+      { l: "Revoke", danger: 1, f: () => confirmModal(`Revoke ${r.role} from ${r.user_id}?`, r.agent_group_id ? `Scoped to ${agName(r.agent_group_id)}.` : "This is a global grant.",
+          () => ncl("roles", "revoke", { user: r.user_id, role: r.role, ...(r.agent_group_id ? { group: r.agent_group_id } : {}) }), () => refresh(), "Revoke role") },
+    ],
+  },
+
+  members: {
+    label: "Members", icon: "users", res: "members",
+    desc: "Unprivileged access grants — lets a user interact with an agent group (sender_scope=known).",
+    empty: { t: "No members", h: "Members can talk to an agent group without any admin powers." },
+    needs: ["members", "users", "groups"],
+    cols: [
+      { k: "user_id", l: "User", r: r => `<span class="mono">${esc(r.user_id)}</span>` },
+      { k: "agent_group_id", l: "Agent group", r: r => `<b>${esc(agName(r.agent_group_id))}</b>` },
+      { k: "added_by", l: "Added by", r: r => `<span class="mono">${esc(r.added_by || "—")}</span>` },
+      { k: "added_at", l: "Added", r: r => fmtDate(r.added_at) },
+    ],
+    create: { title: "Add member", btn: "Add member", verb: "add", fields: [
+      { key: "user", label: "User", req: 1, type: "select", optionsFn: userOpts },
+      { key: "group", label: "Agent group", req: 1, type: "select", optionsFn: agOpts },
+    ]},
+    rowActions: r => [
+      { l: "Remove", danger: 1, f: () => confirmModal(`Remove ${r.user_id} from ${agName(r.agent_group_id)}?`, "The user loses membership access to this agent group.",
+          () => ncl("members", "remove", { user: r.user_id, group: r.agent_group_id }), () => refresh(), "Remove member") },
+    ],
+  },
+
+  policies: {
+    label: "A2A Policies", icon: "swap", res: "policies",
+    desc: "Agent-to-agent approval gates. A row = every message from → to requires human approval. Directed, per-pair.",
+    empty: { t: "No A2A gates", h: "Agent-to-agent messages flow freely right now. Add a policy to require sign-off." },
+    needs: ["policies", "groups", "users"],
+    cols: [
+      { k: "from_agent_group_id", l: "From", r: r => `<b>${esc(agName(r.from_agent_group_id))}</b>` },
+      { k: "to_agent_group_id", l: "To", r: r => `<b>${esc(agName(r.to_agent_group_id))}</b>` },
+      { k: "approver", l: "Approver", r: r => `<span class="mono">${esc(r.approver)}</span>` },
+      { k: "created_at", l: "Created", r: r => fmtDate(r.created_at) },
+    ],
+    create: { title: "New approval policy", btn: "Set policy", verb: "set", fields: [
+      { key: "from", label: "From agent group", req: 1, type: "select", optionsFn: agOpts },
+      { key: "to", label: "To agent group", req: 1, type: "select", optionsFn: agOpts },
+      { key: "approver", label: "Approver (user)", req: 1, type: "select", optionsFn: userOpts },
+    ]},
+    rowActions: r => [
+      { l: "Remove", danger: 1, f: () => confirmModal("Remove this policy?", `${agName(r.from_agent_group_id)} → ${agName(r.to_agent_group_id)} goes back to free flow.`,
+          () => ncl("policies", "remove", { from: r.from_agent_group_id, to: r.to_agent_group_id }), () => refresh(), "Remove policy") },
+    ],
+  },
+
+  approvals: {
+    label: "Approvals", icon: "check-c", res: "approvals", auto: 1,
+    desc: "In-flight approval cards waiting for an admin response (read-only; respond from the channel).",
+    empty: { t: "Nothing needs your sign-off", h: "When an agent asks permission for something, it lands here." },
+    needs: ["approvals", "groups"],
+    cols: [
+      { k: "title", l: "Title", r: r => `<b>${esc(r.title || r.action)}</b>` },
+      { k: "action", l: "Action", r: r => chip(r.action, "acc") },
+      { k: "status", l: "Status", r: r => statusChip(r.status) },
+      { k: "agent_group_id", l: "Agent", r: r => esc(r.agent_group_id ? agName(r.agent_group_id) : "—") },
+      { k: "created_at", l: "Created", r: r => fmtDate(r.created_at) },
+      { k: "expires_at", l: "Expires", r: r => fmtDate(r.expires_at) },
+    ],
+  },
+
+  "dropped-messages": {
+    label: "Dropped Messages", icon: "drop", res: "dropped-messages", auto: 1,
+    desc: "Messages dropped by the router or access gate, aggregated per (channel, chat, sender).",
+    empty: { t: "No dropped messages", h: "Everyone who wrote in got through. Nice and tidy." },
+    needs: ["dropped-messages", "groups", "messaging-groups"],
+    cols: [
+      { k: "sender_name", l: "Sender", r: r => `<b>${esc(r.sender_name || r.user_id || "unknown")}</b>` },
+      { k: "channel_type", l: "Channel", r: r => chip(r.channel_type, "acc") },
+      { k: "platform_id", l: "Chat", r: r => `<span class="mono">${esc(r.platform_id)}</span>` },
+      { k: "reason", l: "Reason", r: r => chip(r.reason, r.reason === "no_agent_wired" ? "err" : "warn") },
+      { k: "message_count", l: "Count", r: r => `<b>${esc(r.message_count)}</b>` },
+      { k: "last_seen", l: "Last seen", r: r => fmtDate(r.last_seen) },
+    ],
+  },
+
+  "user-dms": {
+    label: "User DMs", icon: "mail", res: "user-dms",
+    desc: "Cold-DM cache — maps (user, channel) to the messaging group used for DM delivery.",
+    empty: { t: "No cached DM routes", h: "DM routes get remembered here after first contact." },
+    needs: ["user-dms", "messaging-groups"],
+    cols: [
+      { k: "user_id", l: "User", r: r => `<span class="mono">${esc(r.user_id)}</span>` },
+      { k: "channel_type", l: "Channel", r: r => chip(r.channel_type, "acc") },
+      { k: "messaging_group_id", l: "DM messaging group", r: r => `${esc(mgName(r.messaging_group_id))}<br><span class="mono count">${esc(r.messaging_group_id)}</span>` },
+      { k: "resolved_at", l: "Resolved", r: r => fmtDate(r.resolved_at) },
+    ],
+  },
+};
+
+const NAV_SECTIONS = [
+  { name: "", items: ["overview", "chat", "topology"] },
+  { name: "Routing", items: ["groups", "messaging-groups", "wirings", "destinations"] },
+  { name: "Runtime", items: ["sessions", "tasks", "approvals", "dropped-messages"] },
+  { name: "Access", items: ["users", "roles", "members", "policies", "user-dms"] },
+];
+const BOTTOM_NAV = ["overview", "chat", "sessions", "approvals"];
+
+/* ============================ navigation ============================= */
+function navItem(k, cls) {
+  const badge = k === "approvals" ? `<span data-badge="approvals"></span>` : "";
+  return `<button class="${cls}" onclick="nav('${k}')" ${S.page === k ? 'aria-current="page"' : ""}>${ico(REG[k].icon)}<span>${REG[k].label}</span>${badge}</button>`;
+}
+function renderNav() {
+  $("#nav").innerHTML = NAV_SECTIONS.map(sec =>
+    (sec.name ? `<div class="nav-sec">${sec.name}</div>` : "") +
+    sec.items.map(k => navItem(k, "nav-it")).join("")
+  ).join("");
+  $("#bottomnav").innerHTML =
+    BOTTOM_NAV.map(k => navItem(k, "bnav-it")).join("") +
+    `<button class="bnav-it" onclick="openMore()" ${!BOTTOM_NAV.includes(S.page) ? 'aria-current="page"' : ""}>${ico("more")}<span>More</span></button>`;
+  updateBadges();
+}
+function openMore() {
+  S.lastFocus = document.activeElement;
+  $("#moresheet").innerHTML = `<div class="grab"></div>` +
+    NAV_SECTIONS.map(sec =>
+      (sec.name ? `<div class="nav-sec">${sec.name}</div>` : "") +
+      sec.items.map(k => navItem(k, "nav-it")).join("")
+    ).join("") +
+    `<div class="foot">
+       <button class="btn sm icon" onclick="toggleTheme()" aria-label="Toggle theme">${ico(document.documentElement.dataset.theme === "light" ? "moon" : "sun")}</button>
+       <button class="btn sm" onclick="logout()">${ico("lock")} Lock</button>
+       <span class="mono">${esc($("#conninfo").textContent)}</span>
+     </div>`;
+  $("#overlay").classList.add("on");
+  $("#moresheet").classList.add("on");
+  updateBadges();
+}
+function closeMore() { $("#moresheet").classList.remove("on"); syncOverlay(); }
+function syncOverlay() {
+  const anyOpen = $("#drawer").classList.contains("on") || $("#moresheet").classList.contains("on");
+  $("#overlay").classList.toggle("on", anyOpen);
+}
+function closeAllLayers() { closeDrawer(); closeMore(); }
+
+async function nav(page) {
+  S.page = page; S.filter = "";
+  stopChatPoll();
+  closeAllLayers(); closeModal();
+  renderNav();
+  $("#tb-title").textContent = REG[page].label;
+  clearInterval(S.autoTimer); S.autoTimer = null;
+  const def = REG[page];
+  $("#fab").hidden = !def.create;
+  if (def.create) $("#fab").setAttribute("aria-label", def.create.title);
+  if (def.custom) {
+    $("#main").innerHTML = `<div class="pagehead"><div class="toprow"><h2>${esc(def.label)}</h2></div></div>` + skelBlock();
+    try { await Promise.all((def.needs || []).map(r => loadList(r))); } catch (e) { /* toasted */ }
+    if (S.page !== page) return;
+    def.custom();
+    if (def.auto && S.auto) startAuto(page);
+    return;
+  }
+  renderTablePage(page, true);
+  try { await Promise.all((def.needs || []).map(r => loadList(r))); } catch (e) { /* toasted */ }
+  if (S.page !== page) return;
+  renderRows(page);
+  if (def.auto && S.auto) startAuto(page);
+}
+function startAuto(page) {
+  clearInterval(S.autoTimer);
+  S.autoTimer = setInterval(async () => {
+    if (document.hidden || S.page !== page) return;
+    const def = REG[page];
+    if (def.custom) {
+      // renderOverview force-refreshes the live resources itself; skip the
+      // re-render while any layer is open or focus sits inside the page.
+      const focusBusy = document.activeElement && document.activeElement !== document.body && $("#main").contains(document.activeElement);
+      if (!$("#drawer").classList.contains("on") && !$("#modalwrap").classList.contains("on") && !$("#moresheet").classList.contains("on") && !focusBusy) def.custom();
+    } else {
+      await loadList(def.res, true);
+      renderRows(page);
+    }
+  }, 8000);
+}
+async function refresh() {
+  const def = REG[S.page];
+  await Promise.all((def.needs || [def.res]).filter(Boolean).map(r => loadList(r, true)));
+  if (def.custom) def.custom(); else renderRows(S.page);
+}
+function toggleAuto(el, page) {
+  S.auto = el.getAttribute("aria-checked") !== "true";
+  el.setAttribute("aria-checked", String(S.auto));
+  localStorage.setItem("ncl_dash_auto", String(S.auto));
+  if (S.auto) startAuto(page); else { clearInterval(S.autoTimer); S.autoTimer = null; }
+}
+
+/* ============================ table pages ============================ */
+function fmtDate(v) {
+  if (!v) return `<span class="count">—</span>`;
+  // sqlite passthrough rows (created_at/granted_at/added_at…) are UTC in the
+  // space-separated "YYYY-MM-DD HH:MM:SS" form, which browsers parse as LOCAL
+  // time — skewing every relative time by the viewer's offset. Canonicalize to
+  // ISO-Z first; values already in "…T…Z" form pass through unchanged.
+  let s = String(v);
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(s)) s = s.replace(" ", "T") + "Z";
+  const d = new Date(s);
+  if (isNaN(d)) return esc(v);
+  const diff = Date.now() - d.getTime();
+  // Future values (task next_run) render as "in Xm/h/d" instead of "ago".
+  const abs = Math.abs(diff);
+  const unit = abs < 3600e3 ? Math.floor(abs / 60e3) + "m" : abs < 86400e3 ? Math.floor(abs / 3600e3) + "h" : Math.floor(abs / 86400e3) + "d";
+  const rel = abs < 60e3 ? (diff >= 0 ? "just now" : "in <1m") : diff >= 0 ? unit + " ago" : "in " + unit;
+  return `<span title="${esc(d.toISOString())}">${rel}</span>`;
+}
+function skelBlock(rows = 6) {
+  return `<div class="tablewrap" style="padding:16px" aria-hidden="true">` +
+    Array.from({ length: rows }, (_, i) => `<span class="skel" style="width:${88 - (i % 3) * 14}%;margin:12px 0"></span>`).join("") +
+    `</div>`;
+}
+function livePill(page) {
+  return `<button class="live" role="switch" aria-checked="${S.auto}" onclick="toggleAuto(this,'${page}')" title="Auto-refresh every 8 seconds"><span class="dot"></span>Live</button>`;
+}
+
+function renderTablePage(page, loading) {
+  const def = REG[page];
+  const sortOpts = def.cols.map(c => `<option value="${c.k}:1">${esc(c.l)} ↑</option><option value="${c.k}:-1">${esc(c.l)} ↓</option>`).join("");
+  $("#main").innerHTML = `
+    <div class="pagehead">
+      <div class="toprow">
+        <h2>${esc(def.label)}</h2>
+        <span class="count" id="rowcount"></span>
+      </div>
+      <div class="desc">${def.desc || ""}</div>
+      <div class="toolbar">
+        <label class="search"><span class="sr">Filter rows</span>${ico("search")}<input placeholder="Filter…" value="${esc(S.filter)}" oninput="S.filter=this.value;renderRows('${page}')"></label>
+        <select id="sortsel" aria-label="Sort by" onchange="setSortSel('${page}',this.value)"><option value="">Sort…</option>${sortOpts}</select>
+        <div class="spacer only-desktop"></div>
+        ${def.auto ? livePill(page) : ""}
+        <button class="btn icon" onclick="refresh()" aria-label="Refresh">${ico("refresh")}</button>
+        ${def.create ? `<button class="btn pri only-desktop" onclick="openCreate('${page}')">${ico("plus")} ${esc(def.create.btn || def.create.title)}</button>` : ""}
+      </div>
+    </div>
+    <div class="tablewrap"><table class="data">
+      <thead><tr>${def.cols.map(c => `<th aria-sort="none" id="th-${c.k}"><button type="button" onclick="sortBy('${page}','${c.k}')">${c.l} <span class="arrow" id="arr-${c.k}"></span></button></th>`).join("")}<th><span class="sr">Actions</span></th></tr></thead>
+      <tbody id="tbody">${loading ? `<tr><td colspan="${def.cols.length + 1}" style="padding:16px">` + Array.from({ length: 5 }, (_, i) => `<span class="skel" style="width:${90 - (i % 3) * 16}%;margin:12px 0"></span>`).join("") + `</td></tr>` : ""}</tbody>
+    </table></div>`;
+  if (!loading) renderRows(page);
+}
+
+function sortBy(page, col) {
+  const s = S.sort[page] || {};
+  S.sort[page] = { col, dir: s.col === col && s.dir === 1 ? -1 : 1 };
+  renderRows(page);
+}
+function setSortSel(page, v) {
+  if (!v) { delete S.sort[page]; } else {
+    const [col, dir] = v.split(":");
+    S.sort[page] = { col, dir: +dir };
+  }
+  renderRows(page);
+}
+
+function rowsFor(page) {
+  const def = REG[page];
+  let rows = (S.cache[def.res] || []).slice();
+  if (S.filter) {
+    const f = S.filter.toLowerCase();
+    rows = rows.filter(r => JSON.stringify(r).toLowerCase().includes(f));
+  }
+  const s = S.sort[page];
+  if (s) rows.sort((a, b) => {
+    const x = a[s.col], y = b[s.col];
+    return (x == null ? -1 : y == null ? 1 : String(x).localeCompare(String(y), undefined, { numeric: true })) * s.dir;
+  });
+  return rows;
+}
+
+function emptyHtml(def) {
+  if (S.filter) {
+    return `<div class="empty"><div class="eico">${ico("search")}</div>
+      <div class="t">Nothing matches “${esc(S.filter)}”</div>
+      <div class="h">Try a shorter fragment — the filter searches every field, IDs included.</div>
+      <button class="btn sm" onclick="S.filter='';renderTablePage(S.page)">Clear filter</button></div>`;
+  }
+  const e = def.empty || { t: "Nothing here yet", h: "" };
+  return `<div class="empty"><div class="eico">${ico("sparkle")}</div>
+    <div class="t">${esc(e.t)}</div><div class="h">${esc(e.h)}</div>
+    ${def.create ? `<button class="btn pri" onclick="openCreate(S.page)">${ico("plus")} ${esc(def.create.btn || def.create.title)}</button>` : ""}</div>`;
+}
+
+function renderRows(page) {
+  if (S.page !== page) return;
+  const def = REG[page];
+  // Compute rows ONCE and snapshot them alongside the DOM we're about to write.
+  // Row click handlers resolve by positional index into THIS exact array — never
+  // rowsFor() again (which re-filters/re-sorts and would pick the wrong row after
+  // an auto-refresh or re-sort between render and click).
+  const rows = rowsFor(page);
+  S.rendered = rows;
+  const tb = $("#tbody");
+  if (!tb) return;
+  const rc = $("#rowcount");
+  if (rc) rc.textContent = `${rows.length} row${rows.length === 1 ? "" : "s"}`;
+  def.cols.forEach(c => {
+    const el = $("#arr-" + CSS.escape(c.k));
+    const th = $("#th-" + CSS.escape(c.k));
+    const cur = S.sort[page]?.col === c.k;
+    if (el) el.textContent = cur ? (S.sort[page].dir === 1 ? "▲" : "▼") : "";
+    if (th) th.setAttribute("aria-sort", cur ? (S.sort[page].dir === 1 ? "ascending" : "descending") : "none");
+  });
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="${def.cols.length + 1}">${emptyHtml(def)}</td></tr>`; return; }
+  tb.innerHTML = rows.map((r, i) =>
+    `<tr tabindex="0" onclick="openDetail('${page}',${i})" onkeydown="if(event.key==='Enter'){openDetail('${page}',${i})}">` +
+    def.cols.map((c, ci) => `<td data-label="${esc(c.l)}"${ci === 0 ? ' class="c-title"' : ""}>${c.r(r)}</td>`).join("") +
+    `<td class="actions-cell" onclick="event.stopPropagation()">${rowBtns(page, rows[i], i)}</td></tr>`
+  ).join("");
+}
+function rowBtns(page, r, i) {
+  const def = REG[page];
+  if (!def.rowActions) return "";
+  return def.rowActions(r).map((a, j) =>
+    `<button class="btn sm ${a.danger ? "danger" : ""}" onclick="rowAction('${page}',${i},${j})">${esc(a.l)}</button>`
+  ).join(" ");
+}
+function rowAction(page, i, j) {
+  const r = S.rendered[i];
+  if (!r) return;
+  REG[page].rowActions(r)[j].f();
+}
+
+/* ============================ detail drawer ========================== */
+function openDetail(page, i) {
+  const def = REG[page];
+  const r = S.rendered[i];
+  if (!r) return;
+  const name = r.name || r.display_name || r.title || r.local_name || r.sender_name || r.series_id || r.user_id || r.id || r.approval_id || "";
+  const sub = `${def.label.replace(/s$/, "")} · ${r.id || r.series_id || r.approval_id || r.local_name || r.user_id || ""}`;
+  openDrawer(String(name), sub, `
+    ${def.rowActions ? `<div class="actions">${def.rowActions(r).map((a, j) =>
+      `<button class="btn sm ${a.danger ? "danger" : ""}" onclick="rowAction('${page}',${i},${j})">${esc(a.l)}</button>`).join("")}</div>` : ""}
+    <div class="dsec">Fields</div>
+    <table class="kv">${Object.entries(r).map(([k, v]) =>
+      `<tr><td>${esc(k)}</td><td class="mono copyable" title="Tap to copy" data-copy="${esc(String(v ?? ""))}">${esc(prettyVal(v))}</td></tr>`).join("")}
+    </table>
+    ${page === "groups" ? `<div class="dsec">Container config</div><div id="cfgslot" class="count">Fetching config…</div>` : ""}
+    ${page === "tasks" ? `<div class="dsec">Full task (tasks get)</div><div id="taskslot" class="count">Fetching full prompt, script and run log…</div>` : ""}
+  `);
+  if (page === "groups") loadGroupConfig(r);
+  if (page === "tasks") loadTaskDetail(r);
+}
+/* List rows truncate the prompt and omit the script/run log entirely — the
+   `get` verb has them, so hydrate the drawer with the full record. */
+async function loadTaskDetail(r) {
+  const res = await ncl("tasks", "get", { id: r.series_id, session: r.session_id });
+  const slot = $("#taskslot");
+  if (!slot) return;
+  if (!res.ok) { slot.innerHTML = `<span class="chip err">${esc(res.error?.message || "failed")}</span>`; return; }
+  const t = res.data;
+  slot.innerHTML = `
+    <table class="kv">
+      <tr><td>prompt</td><td class="mono copyable" title="Tap to copy" data-copy="${esc(t.prompt ?? "")}">${esc(t.prompt ?? "—")}</td></tr>
+      <tr><td>script</td><td class="mono copyable" title="Tap to copy" data-copy="${esc(t.script ?? "")}">${esc(t.script ?? "—")}</td></tr>
+      <tr><td>origin_session_id</td><td class="mono">${esc(t.origin_session_id ?? "— (CLI-created)")}</td></tr>
+      <tr><td>completed_runs</td><td class="mono">${esc(t.completed_runs ?? 0)}</td></tr>
+      <tr><td>failed_runs</td><td class="mono">${esc(t.failed_runs ?? 0)}</td></tr>
+    </table>
+    <div class="dsec">Recent run log</div>
+    ${(t.recent_log || []).length
+      ? `<div class="mono" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px">${(t.recent_log || []).map(esc).join("\n")}</div>`
+      : `<div class="count">No log entries yet.</div>`}
+  `;
+}
+function prettyVal(v) {
+  if (v === null || v === undefined) return "—";
+  const s = String(v);
+  if (s.startsWith("{") || s.startsWith("[")) { try { return JSON.stringify(JSON.parse(s), null, 1); } catch { } }
+  return s;
+}
+function openDrawer(title, sub, bodyHtml) {
+  S.lastFocus = document.activeElement;
+  const d = $("#drawer");
+  d.innerHTML = `<div class="grab"></div><div class="dhead"><div><h3 id="drawer-title">${esc(title)}</h3><div class="sub mono">${esc(sub)}</div></div>
+    <div class="spacer"></div><button class="btn icon" onclick="closeDrawer()" aria-label="Close details">${ico("x")}</button></div>
+    <div class="dbody">${bodyHtml}</div>`;
+  d.setAttribute("aria-labelledby", "drawer-title");
+  d.classList.add("on");
+  $("#overlay").classList.add("on");
+  d.querySelector(".dhead button").focus();
+}
+function closeDrawer() {
+  const d = $("#drawer");
+  if (!d.classList.contains("on")) return;
+  d.classList.remove("on");
+  syncOverlay();
+  if (S.lastFocus && S.lastFocus.isConnected) S.lastFocus.focus();
+}
+
+/* ======================== group config drawer ======================== */
+async function openGroupConfig(g) {
+  openDrawer(`Config — ${g.name}`, g.id, `<div id="cfgslot" class="count">Fetching config…</div>`);
+  loadGroupConfig(g);
+}
+async function loadGroupConfig(g) {
+  const res = await ncl("groups", "config get", { id: g.id });
+  const slot = $("#cfgslot");
+  if (!slot) return;
+  if (!res.ok) { slot.innerHTML = `<span class="chip err">${esc(res.error?.message || "failed")}</span>`; return; }
+  const c = res.data;
+  S.cfgCtx = { id: g.id, g, mcp: Object.keys(c.mcp_servers || {}), apt: c.packages_apt || [], npm: c.packages_npm || [] };
+  const scalarField = (key, label, value, opts) => `
+    <div class="ffield"><label for="cfg-${key}">${label}</label>
+      ${opts ? `<select id="cfg-${key}">${opts.map(o => `<option value="${esc(o)}" ${String(value ?? "") === o ? "selected" : ""}>${esc(o || "(default)")}</option>`).join("")}</select>`
+        : `<input id="cfg-${key}" value="${esc(value ?? "")}">`}
+    </div>`;
+  slot.innerHTML = `
+    <div class="note">${ico("alert")}<span>Scalar changes need a <b>restart</b>; package changes need <b>restart --rebuild</b>.</span></div>
+    <div class="dsec">Scalars</div>
+    ${scalarField("provider", "Provider", c.provider)}
+    ${scalarField("model", "Model", c.model)}
+    ${scalarField("effort", "Effort", c.effort)}
+    ${scalarField("image-tag", "Image tag", c.image_tag)}
+    ${scalarField("assistant-name", "Assistant name", c.assistant_name)}
+    ${scalarField("max-messages-per-prompt", "Max messages per prompt", c.max_messages_per_prompt)}
+    ${scalarField("cli-scope", "CLI scope", c.cli_scope, ["disabled", "group", "global"])}
+    <div class="fbtns"><button class="btn pri" onclick="saveGroupConfig('${g.id}')">Save changes</button></div>
+
+    <div class="dsec">MCP servers</div>
+    <div id="mcplist">${Object.entries(c.mcp_servers || {}).map(([name, def], i) => `
+      <div class="listrow"><span class="grow mono"><b>${esc(name)}</b> — ${esc(def.command || "")} ${esc((def.args || []).join(" "))}</span>
+      <button class="btn sm danger" onclick="rmMcp(${i})">Remove</button></div>`).join("") || `<div class="count">None wired.</div>`}
+    </div>
+    <div class="actions" style="margin-top:8px"><button class="btn sm" onclick="addMcpModal(S.cfgCtx.id)">${ico("plus")} Add MCP server</button></div>
+
+    <div class="dsec">Packages</div>
+    ${["apt", "npm"].map(kind => `
+      <div><b style="font-size:12px">${kind}</b>
+      ${(c["packages_" + kind] || []).map((p, i) => `
+        <div class="listrow"><span class="grow mono">${esc(p)}</span>
+        <button class="btn sm danger" onclick="rmPkg('${kind}',${i})">Remove</button></div>`).join("") || `<div class="count">none</div>`}
+      </div>`).join("")}
+    <div class="actions" style="margin-top:8px"><button class="btn sm" onclick="addPkgModal(S.cfgCtx.id)">${ico("plus")} Add package</button></div>
+
+    <div class="dsec">Other (read-only here)</div>
+    <table class="kv">
+      <tr><td>skills</td><td class="mono">${esc(prettyVal(c.skills))}</td></tr>
+      <tr><td>additional_mounts</td><td class="mono">${esc(JSON.stringify(c.additional_mounts || []))}</td></tr>
+      <tr><td>updated_at</td><td class="mono">${esc(c.updated_at || "")}</td></tr>
+    </table>
+    <div class="actions"><button class="btn" onclick="restartGroupModal(S.cfgCtx.g)">${ico("refresh")} Restart group…</button></div>
+  `;
+}
+function rmMcp(i) {
+  const { id, mcp } = S.cfgCtx; const name = mcp[i];
+  confirmModal(`Remove MCP server "${name}"?`, "Takes effect after the group restarts.",
+    () => ncl("groups", "config remove-mcp-server", { id, name }), () => reopenCfg(id), "Remove MCP server");
+}
+function rmPkg(kind, i) {
+  const { id } = S.cfgCtx; const pkg = S.cfgCtx[kind][i];
+  confirmModal(`Remove ${kind} package "${pkg}"?`, "Takes effect after restart --rebuild.",
+    () => ncl("groups", "config remove-package", { id, [kind]: pkg }), () => reopenCfg(id), "Remove package");
+}
+function reopenCfg(id) {
+  const g = (S.cache.groups || []).find(x => x.id === id) || { id, name: id };
+  openGroupConfig(g);
+}
+async function saveGroupConfig(id) {
+  const args = { id };
+  for (const k of ["provider", "model", "effort", "image-tag", "assistant-name", "max-messages-per-prompt", "cli-scope"]) {
+    const el = $("#cfg-" + CSS.escape(k));
+    if (el && el.value !== "") args[k] = el.value;
+  }
+  const res = await ncl("groups", "config update", args);
+  toast(res.ok, res.ok ? "Config saved — restart to apply" : "Config update failed", res.ok ? "" : res.error?.message, res.cmd);
+  if (res.ok) reopenCfg(id);
+}
+function addMcpModal(id) {
+  formModal("Add MCP server", "groups config add-mcp-server", [
+    { key: "name", label: "Server name", req: 1 },
+    { key: "command", label: "Command", req: 1, help: "e.g. npx" },
+    { key: "args", label: "Args (JSON array)", help: 'e.g. ["-y","@some/mcp-server"]' },
+    { key: "env", label: "Env (JSON object)", help: 'e.g. {"KEY":"value"}' },
+  ], vals => ncl("groups", "config add-mcp-server", { id, ...vals }), () => reopenCfg(id),
+    { submitLabel: "Add server", note: "Takes effect after the group restarts." });
+}
+function addPkgModal(id) {
+  formModal("Add package", "groups config add-package", [
+    { key: "_kind", label: "Package manager", req: 1, type: "select", options: [{v:"apt",l:"apt"},{v:"npm",l:"npm"}] },
+    { key: "_pkg", label: "Package name", req: 1 },
+  ], vals => ncl("groups", "config add-package", { id, [vals._kind]: vals._pkg }), () => reopenCfg(id),
+    { submitLabel: "Add package", note: "Takes effect after restart --rebuild." });
+}
+function restartGroupModal(g) {
+  formModal(`Restart "${g.name}"`, "groups restart", [
+    { key: "rebuild", label: "Rebuild container image first (required for package changes)", type: "checkbox" },
+    { key: "message", label: "On-wake message (optional)", type: "textarea", help: "Instruction for the fresh container to act on when it starts. Without it, the container only starts on the next user message." },
+  ], vals => ncl("groups", "restart", { id: g.id, ...vals }), () => refresh(),
+    { submitLabel: "Restart group", danger: 1, note: "This kills the group's running containers on the LIVE instance." });
+}
+
+/* ============================ modals/forms =========================== */
+function openCreate(page) {
+  const def = REG[page];
+  const c = def.create;
+  if (!c) return;
+  formModal(c.title, `${def.res} ${c.verb || "create"}`, c.fields,
+    vals => ncl(def.res, c.verb || "create", vals), () => refresh(),
+    { submitLabel: c.btn || "Create", note: c.after });
+}
+
+let modalSubmit = null;
+function formModal(title, cmdLabel, fields, submitFn, onDone, opts = {}) {
+  const { note, danger, submitLabel } = opts;
+  S.lastFocus = document.activeElement;
+  const wrap = $("#modalwrap"); const m = $("#modal");
+  m.innerHTML = `
+    <h3 id="modal-title">${esc(title)}</h3>
+    <div class="msub">ncl ${esc(cmdLabel)}</div>
+    ${danger ? `<div class="confirm-danger">${ico("alert")}<span>This changes the live instance. Double-check before you go.</span></div>` : ""}
+    ${note ? `<div class="note">${ico("alert")}<span>${esc(note)}</span></div>` : ""}
+    ${fields.map(f => {
+      const id = "f-" + f.key;
+      const opts2 = f.optionsFn ? f.optionsFn() : f.options;
+      let input;
+      if (f.type === "select") {
+        input = `<select id="${id}">${(f.req && !f.value ? [{ v: "", l: "— select —" }] : []).concat(opts2 || []).map(o =>
+          `<option value="${esc(o.v)}" ${String(f.value ?? "") === String(o.v) ? "selected" : ""}>${esc(o.l)}</option>`).join("")}</select>`;
+      } else if (f.type === "checkbox") {
+        input = `<label class="toggle"><input type="checkbox" id="${id}"> yes</label>`;
+      } else if (f.type === "textarea") {
+        input = `<textarea id="${id}" rows="3">${esc(f.value ?? "")}</textarea>`;
+      } else {
+        input = `<input id="${id}" value="${esc(f.value ?? "")}" ${f.expect ? 'autocomplete="off" spellcheck="false"' : ""}>`;
+      }
+      return `<div class="ffield"><label for="${id}">${esc(f.label)} ${f.req ? '<b class="req" aria-hidden="true">*</b>' : ""}</label>${input}${f.help ? `<div class="help">${esc(f.help)}</div>` : ""}</div>`;
+    }).join("")}
+    <div class="fbtns">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn ${danger ? "danger-fill" : "pri"}" id="msubmit">${esc(submitLabel || "Submit")}</button>
+    </div>`;
+  m.setAttribute("aria-labelledby", "modal-title");
+  wrap.classList.add("on");
+  const first = m.querySelector("input, select, textarea, #msubmit");
+  if (first) first.focus();
+  modalSubmit = async () => {
+    const vals = {};
+    for (const f of fields) {
+      const el = $("#f-" + CSS.escape(f.key));
+      let v = f.type === "checkbox" ? el.checked : el.value.trim();
+      if (f.req && (v === "" || v === false || v === undefined)) { toast(false, "Missing required field", f.label); return; }
+      if (f.expect !== undefined) {
+        // Normalize both sides: the input arrives trimmed, so trim the expected
+        // value too — otherwise a name with leading/trailing whitespace can never
+        // be typed to match and the group becomes permanently undeletable.
+        const expect = String(f.expect).trim();
+        if (String(v).trim() !== expect) { toast(false, "Name doesn't match", `Type "${expect}" exactly to confirm.`); return; }
+        continue; // confirmation-only field, not an ncl arg
+      }
+      if (v !== "" && v !== false) vals[f.key] = v;
+    }
+    const sb = $("#msubmit");
+    sb.disabled = true; sb.textContent = "Running…";
+    let res;
+    try { res = await submitFn(vals); } catch (e) { res = { ok: false, error: { message: e.message } }; }
+    toast(res.ok, res.ok ? title.replace(/[?]$/, "") + " — done" : title.replace(/[?]$/, "") + " — failed",
+      res.ok ? (typeof res.data === "string" ? res.data : summarize(res.data)) : res.error?.message, res.cmd);
+    if (res.ok) { closeModal(); onDone && onDone(res); }
+    else { sb.disabled = false; sb.textContent = submitLabel || "Submit"; }
+  };
+  $("#msubmit").onclick = modalSubmit;
+}
+function summarize(d) {
+  if (d == null) return "";
+  if (typeof d === "object") { const s = JSON.stringify(d); return s.length > 260 ? s.slice(0, 260) + "…" : s; }
+  return String(d);
+}
+function confirmModal(title, detail, actionFn, onDone, verb) {
+  formModal(title, "confirm", [], actionFn, onDone, { note: detail, danger: 1, submitLabel: verb || "Confirm" });
+}
+function closeModal() {
+  const wrap = $("#modalwrap");
+  if (!wrap.classList.contains("on")) return;
+  wrap.classList.remove("on");
+  if (S.lastFocus && S.lastFocus.isConnected) S.lastFocus.focus();
+}
+$("#modalwrap").addEventListener("click", e => { if (e.target.id === "modalwrap") closeModal(); });
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if ($("#modalwrap").classList.contains("on")) { closeModal(); return; }
+  if ($("#moresheet").classList.contains("on")) { closeMore(); return; }
+  closeDrawer();
+});
+document.addEventListener("click", e => {
+  const td = e.target.closest ? e.target.closest("td.copyable") : null;
+  if (td && navigator.clipboard) navigator.clipboard.writeText(td.dataset.copy).then(() => toast(true, "Copied to clipboard"));
+});
+
+/* ============================== overview ============================= */
+function greeting() {
+  const h = new Date().getHours();
+  return h < 6 ? "Up late?" : h < 12 ? "Good morning." : h < 18 ? "Good afternoon." : "Good evening.";
+}
+function layerOpen() {
+  return $("#drawer").classList.contains("on") || $("#modalwrap").classList.contains("on") || $("#moresheet").classList.contains("on");
+}
+async function renderOverview() {
+  const page = "overview";
+  // Fast first paint: force-refresh the live + inventory resources the header and
+  // panels need, but don't block on sessions (ncl checks containers — slow).
+  const sessP = loadList("sessions", true);
+  await Promise.all([loadList("approvals", true), loadList("dropped-messages", true), loadList("groups", true), loadList("messaging-groups", true)]);
+  if (S.page !== page) return;
+  renderOverviewBody();
+  // Hydrate the rest (inventory pills + wirings panel). Force-load every one so
+  // the manual Refresh button and auto-refresh actually re-fetch them — they used
+  // to load from cache once and then never update.
+  const rest = ["wirings", "users", "roles", "members", "destinations", "policies", "user-dms", "tasks"];
+  await Promise.all([sessP, ...rest.map(r => loadList(r, true))]);
+  if (S.page === page && !layerOpen()) renderOverviewBody();
+}
+function renderOverviewBody() {
+  const sessLoaded = !!S.cache.sessions;
+  const sessions = S.cache.sessions || [];
+  const awake = sessions.filter(s => s.container_status === "running");
+  const pending = (S.cache.approvals || []).filter(a => a.status === "pending");
+  const drops = S.cache["dropped-messages"] || [];
+  const dropTotal = drops.reduce((n, d) => n + (+d.message_count || 0), 0);
+  const recentDrop = drops.filter(d => d.last_seen && Date.now() - new Date(d.last_seen).getTime() < 86400e3).length;
+
+  const headline =
+    pending.length ? `${pending.length} approval${pending.length > 1 ? "s" : ""} waiting on you.` :
+    recentDrop ? `${recentDrop} sender${recentDrop > 1 ? "s were" : " was"} dropped in the last day.` :
+    !sessLoaded ? "Checking on the fleet…" :
+    awake.length ? `${awake.length} agent${awake.length > 1 ? "s are" : " is"} awake and working.` :
+    "All quiet — every agent is napping.";
+
+  const li = (html) => `<div class="listrow">${html}</div>`;
+  const sessRows = sessLoaded
+    ? sessions.filter(s => s.status === "active").slice(0, 8).map(s => li(
+        `<span class="grow"><b>${esc(agName(s.agent_group_id))}</b> <span class="sub">· ${esc(s.messaging_group_id ? mgName(s.messaging_group_id) : "agent-shared")}</span></span>${containerChip(s.container_status)}`)).join("")
+    : `<div class="pempty">Knocking on every container…</div>`;
+  const apprRows = (S.cache.approvals || []).slice(0, 8).map(a => li(
+    `<span class="grow">${esc(a.title || a.action)} <span class="sub">· ${esc(a.agent_group_id ? agName(a.agent_group_id) : "system")}</span></span>${statusChip(a.status)}`)).join("");
+  const dropRows = drops.slice(0, 8).map(d => li(
+    `<span class="grow"><b>${esc(d.sender_name || d.platform_id)}</b> <span class="sub">· ${esc(d.channel_type)} · ${esc(d.reason)}</span></span><span class="chip">${esc(d.message_count)}</span>`)).join("");
+  const wireRows = S.cache.wirings
+    ? (S.cache.wirings.slice(0, 8).map(w => li(
+        `<span class="grow">${esc(mgName(w.messaging_group_id))} → <b>${esc(agName(w.agent_group_id))}</b></span>${chip(w.engage_mode, "acc")}`)).join(""))
+    : `<div class="pempty">Fetching wirings…</div>`;
+
+  const inv = [["groups", "agent groups"], ["messaging-groups", "chats"], ["wirings", "wirings"], ["destinations", "destinations"], ["tasks", "tasks"], ["users", "users"], ["roles", "roles"], ["members", "members"], ["policies", "A2A policies"], ["user-dms", "cached DMs"]]
+    .map(([k, l]) => `<button class="pill" onclick="nav('${k}')"><b>${S.cache[k] ? S.cache[k].length : "…"}</b> ${l}</button>`).join("");
+
+  $("#main").innerHTML = `
+    <div class="hello">
+      <h2>${greeting()} ${esc(headline)}</h2>
+      <div class="sub">Live from <code>ncl</code> — ${sessLoaded ? sessions.length : "…"} sessions across ${(S.cache.groups || []).length} agent groups.</div>
+    </div>
+    <div class="healthrow">
+      <button class="health ${awake.length ? "good" : "calm"}" onclick="nav('sessions')">
+        <span class="hico">${ico("zap")}</span>
+        <span><span class="hn">${sessLoaded ? awake.length : "…"}</span><span class="hl"> of ${sessLoaded ? sessions.length : "…"} sessions</span><br><span class="hl">agents awake right now</span></span>
+      </button>
+      <button class="health ${pending.length ? "attn" : "calm"}" onclick="nav('approvals')">
+        <span class="hico">${ico("check-c")}</span>
+        <span><span class="hn">${pending.length}</span><br><span class="hl">${pending.length ? "approvals waiting on you" : "nothing needs your sign-off"}</span></span>
+      </button>
+      <button class="health ${recentDrop ? "bad" : "calm"}" onclick="nav('dropped-messages')">
+        <span class="hico">${ico("drop")}</span>
+        <span><span class="hn">${dropTotal}</span><br><span class="hl">${recentDrop ? "dropped messages — some recent" : "dropped messages, none recent"}</span></span>
+      </button>
+    </div>
+    <div class="toolbar" style="margin:0 0 14px">
+      ${livePill("overview")}
+      <button class="btn icon" onclick="refresh()" aria-label="Refresh">${ico("refresh")}</button>
+    </div>
+    <div class="twocol">
+      <div class="panel"><h3>${ico("zap")} Sessions <a href="javascript:nav('sessions')">view all</a></h3><div class="body">${sessRows || `<div class="pempty">No sessions yet — agents show up here once they wake.</div>`}</div></div>
+      <div class="panel"><h3>${ico("check-c")} Approvals <a href="javascript:nav('approvals')">view all</a></h3><div class="body">${apprRows || `<div class="pempty">Nothing needs your sign-off. Enjoy the quiet.</div>`}</div></div>
+      <div class="panel"><h3>${ico("drop")} Recent drops <a href="javascript:nav('dropped-messages')">view all</a></h3><div class="body">${dropRows || `<div class="pempty">Everyone who wrote in got through.</div>`}</div></div>
+      <div class="panel"><h3>${ico("link")} Wirings <a href="javascript:nav('wirings')">view all</a></h3><div class="body">${wireRows || `<div class="pempty">Nothing wired yet — connect a chat to an agent.</div>`}</div></div>
+    </div>
+    <div class="invrow">${inv}</div>`;
+}
+
+/* ============================== topology ============================= */
+function topoZoom(delta) {
+  S.topoZoom = delta === 0 ? 1 : Math.min(2.5, Math.max(0.4, S.topoZoom + delta));
+  const svg = $("#topo svg");
+  if (svg) svg.style.width = Math.round(svg.dataset.w * S.topoZoom) + "px";
+}
+function renderTopology() {
+  const mgs = S.cache["messaging-groups"] || [];
+  const ags = S.cache.groups || [];
+  const wirings = S.cache.wirings || [];
+  const dests = S.cache.destinations || [];
+
+  const NW = 240, NH = 46, GAPY = 16, COLGAP = 380, PAD = 30, TOP = 56;
+  const mgY = {}, agY = {};
+  mgs.forEach((m, i) => mgY[m.id] = TOP + i * (NH + GAPY));
+  ags.forEach((g, i) => agY[g.id] = TOP + i * (NH + GAPY));
+  const H = Math.max(mgs.length, ags.length) * (NH + GAPY) + TOP + PAD;
+  const x1 = PAD, x2 = PAD + NW + COLGAP;
+  const W = x2 + NW + PAD + 70;
+
+  const edgeVar = { mention: "var(--edge-mention)", "mention-sticky": "var(--edge-sticky)", pattern: "var(--edge-pattern)" };
+  let svg = "";
+  svg += `<text class="colhead" x="${x1}" y="26">Messaging groups (${mgs.length})</text>`;
+  svg += `<text class="colhead" x="${x2}" y="26">Agent groups (${ags.length})</text>`;
+
+  const edge = (d, stroke, dash, title, onclick) =>
+    `<g${onclick ? ` onclick="${onclick}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){${onclick}}"` : ""}>` +
+    `<path class="thit" d="${d}"><title>${title}</title></path>` +
+    `<path class="tedge" stroke="${stroke}"${dash ? ` stroke-dasharray="${dash}"` : ""} d="${d}"/></g>`;
+
+  for (const w of wirings) {
+    const ya = mgY[w.messaging_group_id], yb = agY[w.agent_group_id];
+    if (ya === undefined || yb === undefined) continue;
+    const sx = x1 + NW, sy = ya + NH / 2, ex = x2, ey = yb + NH / 2;
+    const c = edgeVar[w.engage_mode] || "var(--muted)";
+    const d = `M${sx},${sy} C${sx + COLGAP / 2},${sy} ${ex - COLGAP / 2},${ey} ${ex},${ey}`;
+    const t = `wiring — ${esc(mgName(w.messaging_group_id))} → ${esc(agName(w.agent_group_id))} · engage=${esc(w.engage_mode)}${w.engage_pattern ? " /" + esc(w.engage_pattern) + "/" : ""} · session=${esc(w.session_mode)}`;
+    svg += edge(d, c, "", t, `topoOpen('wirings','${esc(w.id)}')`);
+  }
+  for (const d of dests) {
+    if (d.target_type === "channel") {
+      const ya = agY[d.agent_group_id], yb = mgY[d.target_id];
+      if (ya === undefined || yb === undefined) continue;
+      const sx = x2, sy = ya + NH / 2 + 8, ex = x1 + NW, ey = yb + NH / 2 + 8;
+      const p = `M${sx},${sy} C${sx - COLGAP / 2},${sy} ${ex + COLGAP / 2},${ey} ${ex},${ey}`;
+      svg += edge(p, "var(--edge-dest)", "5 4", `destination "${esc(d.local_name)}" — ${esc(agName(d.agent_group_id))} sends → ${esc(mgName(d.target_id))}`);
+    } else {
+      const ya = agY[d.agent_group_id], yb = agY[d.target_id];
+      if (ya === undefined || yb === undefined) continue;
+      const sx = x2 + NW, sy = ya + NH / 2, ey = yb + NH / 2;
+      const bow = 40 + Math.abs(ey - sy) / 6;
+      const p = `M${sx},${sy} C${sx + bow},${sy} ${sx + bow},${ey} ${sx},${ey}`;
+      svg += edge(p, "var(--edge-a2a)", "2 4", `A2A destination "${esc(d.local_name)}" — ${esc(agName(d.agent_group_id))} → ${esc(agName(d.target_id))}`);
+    }
+  }
+  mgs.forEach(m => {
+    const y = mgY[m.id];
+    svg += `<g class="tnode" transform="translate(${x1},${y})" role="button" tabindex="0" onclick="topoOpen('messaging-groups','${esc(m.id)}')" onkeydown="if(event.key==='Enter'){topoOpen('messaging-groups','${esc(m.id)}')}">
+      <rect width="${NW}" height="${NH}" rx="12"></rect>
+      <text x="12" y="19">${esc(trunc(m.name || m.platform_id, 26))}</text>
+      <text x="12" y="35" class="sub">${esc(m.channel_type)} · ${m.is_group ? "group" : "DM"} · ${esc(m.unknown_sender_policy)}</text>
+      <title>${esc(m.id)} — ${esc(m.platform_id)}</title></g>`;
+  });
+  ags.forEach(g => {
+    const y = agY[g.id];
+    svg += `<g class="tnode" transform="translate(${x2},${y})" role="button" tabindex="0" onclick="topoOpen('groups','${esc(g.id)}')" onkeydown="if(event.key==='Enter'){topoOpen('groups','${esc(g.id)}')}">
+      <rect width="${NW}" height="${NH}" rx="12"></rect>
+      <text x="12" y="19">${esc(trunc(g.name, 26))}</text>
+      <text x="12" y="35" class="sub">${esc(g.folder)}</text>
+      <title>${esc(g.id)}</title></g>`;
+  });
+
+  $("#main").innerHTML = `
+    <div class="pagehead">
+      <div class="toprow"><h2>Topology</h2></div>
+      <div class="desc">Messaging groups → wirings → agent groups, plus destination ACL edges. Tap an edge or node to open it.</div>
+    </div>
+    <div id="topo">
+      <div class="topo-tools">
+        <button class="btn icon sm" onclick="topoZoom(-0.2)" aria-label="Zoom out">${ico("zoom-out")}</button>
+        <button class="btn icon sm" onclick="topoZoom(0.2)" aria-label="Zoom in">${ico("zoom-in")}</button>
+        <button class="btn sm" onclick="topoZoom(0)">Reset</button>
+        <div class="spacer"></div>
+        <button class="btn icon sm" onclick="refresh()" aria-label="Refresh">${ico("refresh")}</button>
+      </div>
+      <div class="canvas"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" data-w="${W}" role="img" aria-label="Fleet topology graph">${svg}</svg></div>
+      <div class="legend">
+        <span><i style="background:var(--edge-mention)"></i>wiring: mention</span>
+        <span><i style="background:var(--edge-sticky)"></i>wiring: mention-sticky</span>
+        <span><i style="background:var(--edge-pattern)"></i>wiring: pattern</span>
+        <span><i style="background:var(--edge-dest)"></i>destination → channel</span>
+        <span><i style="background:var(--edge-a2a)"></i>destination → agent (A2A)</span>
+      </div>
+    </div>`;
+  topoZoom(0);
+  if (window.innerWidth < 900) topoZoom(-0.4);
+}
+function trunc(s, n) { s = String(s ?? ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+function topoOpen(page, id) {
+  nav(page).then(() => {
+    // nav() → renderRows() has just set S.rendered to the array backing the DOM;
+    // resolve the index against that exact snapshot so openDetail matches.
+    const i = S.rendered.findIndex(r => r.id === id);
+    if (i >= 0) openDetail(page, i);
+  });
+}
+
+/* ================================ chat =============================== */
+const CHAT_POLL_MS = 2500;
+const chatAgent = () => (S.cache.groups || []).find(g => g.id === S.chat?.ag) || { id: S.chat?.ag, name: S.chat?.ag || "?", folder: "" };
+const chatModeSession = () => (S.chat?.sessions || []).find(s => s.id === S.chat.mode);
+const chatProvisionedFor = g => {
+  const mg = (S.cache["messaging-groups"] || []).find(m => m.channel_type === "cli" && m.platform_id === "webui:" + g.folder);
+  return !!mg && (S.cache.wirings || []).some(w => w.messaging_group_id === mg.id && w.agent_group_id === g.id);
+};
+
+function renderChat() {
+  if (S.chat && S.chat.ag) {
+    renderChatConvo();
+    loadChatSessions();
+    chatPoll(true);
+    startChatPoll();
+  } else renderChatPicker();
+}
+
+function renderChatPicker() {
+  stopChatPoll(); S.chat = null;
+  const groups = (S.cache.groups || []).slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const cards = groups.map(g => `
+    <button class="agentcard" onclick="openChat('${esc(g.id)}')" aria-label="Chat with ${esc(g.name)}">
+      <span class="aico">${ico("bot")}</span>
+      <span class="an">${esc(g.name)}</span>
+      <span class="af">${esc(g.folder)}</span>
+      ${chatProvisionedFor(g) ? chip("private line ready", "ok") : chip("needs a one-time setup")}
+    </button>`).join("");
+  $("#main").innerHTML = `
+    <div class="pagehead">
+      <div class="toprow"><h2>Chat</h2><span class="count">${groups.length} agent${groups.length === 1 ? "" : "s"}</span></div>
+      <div class="desc">Talk to any agent right here. Agents without a private line get a friendly one-time setup — everything it creates is named webui:… and removable.</div>
+    </div>
+    ${groups.length ? `<div class="chatpick">${cards}</div>` : `<div class="empty"><div class="eico">${ico("chat")}</div><div class="t">No agents to talk to yet</div><div class="h">Create an agent group first — then come back and say hi.</div></div>`}`;
+}
+
+function openChat(agId) {
+  S.chat = { ag: agId, mode: "webui", sessions: [], provisioned: null, session: null, messages: [], pending: [], sig: "", loaded: false, err: "" };
+  renderChat();
+}
+function closeChat() {
+  stopChatPoll(); S.chat = null;
+  if (S.page === "chat") renderChatPicker();
+}
+
+function renderChatConvo() {
+  const g = chatAgent();
+  $("#main").innerHTML = `
+    <div class="chatwrap full">
+      <div class="chathead">
+        <button class="btn icon" onclick="closeChat()" aria-label="Back to agent list">${ico("back")}</button>
+        <div class="who"><b>${esc(g.name)}</b><span class="sub" id="chatsub"></span></div>
+        <label class="sr" for="chatline">Conversation line</label>
+        <select id="chatline" onchange="setChatLine(this.value)"><option value="webui">Private line (webui)</option></select>
+        <button class="btn icon danger" id="unprovbtn" hidden onclick="unprovisionChat()" aria-label="Remove private line" title="Remove private line">${ico("unplug")}</button>
+      </div>
+      <div class="chatbanner" id="chatbanner"></div>
+      <div class="chatlog" id="chatlog"></div>
+      <form class="composer" id="composer">
+        <label class="sr" for="chatinput">Message ${esc(g.name)}</label>
+        <textarea id="chatinput" rows="1" placeholder="Message ${esc(g.name)}…" oninput="autoGrow(this)" onkeydown="composerKey(event)"></textarea>
+        <button class="btn pri icon" id="sendbtn" type="submit" aria-label="Send message">${ico("send")}</button>
+      </form>
+    </div>`;
+  $("#composer").addEventListener("submit", chatSubmit);
+  renderChatLog();
+  updateChatBanner();
+}
+
+function setChatLine(v) {
+  const c = S.chat; if (!c) return;
+  c.mode = v; c.messages = []; c.pending = []; c.sig = ""; c.loaded = false; c.err = "";
+  renderChatLog(); updateChatBanner(); chatPoll(true);
+}
+
+function updateChatBanner() {
+  const b = $("#chatbanner"); const c = S.chat;
+  if (!b || !c) return;
+  if (c.err) { b.className = "chatbanner on err"; b.innerHTML = `${ico("alert")}<span>${esc(c.err)}</span>`; return; }
+  if (c.mode !== "webui") {
+    const s = chatModeSession();
+    b.className = "chatbanner on warn";
+    b.innerHTML = `${ico("alert")}<span><b>Real chat.</b> Your message goes to the agent as if sent in ${esc(s ? `${s.channelType} · ${s.name || s.platformId}` : "that chat")} — the reply will go to the real chat, not just here.</span>`;
+    return;
+  }
+  b.className = "chatbanner"; b.innerHTML = "";
+}
+
+async function loadChatSessions() {
+  const c = S.chat; if (!c) return;
+  let res;
+  try { res = await api("/api/chat/sessions?agentGroupId=" + encodeURIComponent(c.ag)); } catch { return; }
+  if (S.chat !== c) return;
+  if (!res.ok) { toast(false, "Couldn't list sessions", res.error?.message, res.cmd); return; }
+  c.sessions = Array.isArray(res.data) ? res.data : [];
+  const sel = $("#chatline");
+  if (sel) {
+    const cur = c.mode;
+    // Only list sessions we can actually send to: a null channelType/platformId
+    // makes every send fail ('target.channelType is required'). Prefer hiding
+    // closed/ended sessions, but fall back to all sendable ones if that empties
+    // the list, so a still-relevant closed session stays reachable.
+    const sendable = c.sessions.filter(s => !s.isWebui && s.channelType && s.platformId);
+    const open = sendable.filter(s => s.status !== "closed" && s.status !== "ended");
+    const list = open.length ? open : sendable;
+    sel.innerHTML = `<option value="webui">Private line (webui)</option>` +
+      list.map(s =>
+        `<option value="${esc(s.id)}">${esc(`${s.channelType || "?"} · ${s.name || s.platformId || s.id}${s.threadId ? " · thread" : ""}`)}</option>`).join("");
+    sel.value = cur;
+    if (sel.value !== cur) { sel.value = "webui"; setChatLine("webui"); }
+  }
+}
+
+function startChatPoll() {
+  stopChatPoll();
+  S.chatTimer = setInterval(() => chatPoll(false), CHAT_POLL_MS);
+}
+function stopChatPoll() {
+  if (S.chatTimer) { clearInterval(S.chatTimer); S.chatTimer = null; }
+}
+
+async function chatPoll(force) {
+  const c = S.chat;
+  if (!c || S.page !== "chat" || (!force && document.hidden)) return;
+  const mode = c.mode;
+  const q = mode === "webui" ? "agentGroupId=" + encodeURIComponent(c.ag) : "sessionId=" + encodeURIComponent(mode);
+  let res;
+  try { res = await api("/api/chat/history?" + q); } catch { return; }
+  if (S.chat !== c || c.mode !== mode) return; // user moved on mid-flight
+  if (!res.ok) { c.err = res.error?.message || "couldn't load history"; updateChatBanner(); return; }
+  if (c.err) { c.err = ""; updateChatBanner(); }
+  c.loaded = true;
+  c.provisioned = mode === "webui" ? res.data.provisioned : true;
+  c.session = res.data.session;
+  c.messages = res.data.messages || [];
+  c.pending = c.pending.filter(p => !c.messages.some(m => m.role === "operator" && m.text === p.text && m.time >= p.minTime));
+  renderChatLog();
+}
+
+function fmtDay(d) {
+  const today = new Date(); const yest = new Date(Date.now() - 86400e3);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yest.toDateString()) return "Yesterday";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+const fmtClock = d => isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+function chatSetupCard(g) {
+  return `<div class="chatsetup">
+    <div class="eico" style="margin:0 auto 12px">${ico("sparkle")}</div>
+    <div class="t" style="font-weight:700;font-size:14.5px">No private line to ${esc(g.name)} yet</div>
+    <div class="h">Set one up and you can talk to ${esc(g.name)} right here. This creates a <b>webui messaging group</b> (<code>webui:${esc(g.folder)}</code>), a wiring, and a reply destination on the live instance — clearly named, fully removable.</div>
+    <button class="btn pri" id="provbtn" onclick="provisionChat()">${ico("zap")} Set up private line</button>
+  </div>`;
+}
+
+function renderChatLog() {
+  const c = S.chat, log = $("#chatlog");
+  if (!c || !log) return;
+  const g = chatAgent();
+
+  const sub = $("#chatsub");
+  if (sub) {
+    if (c.mode === "webui") {
+      sub.textContent = "webui:" + (g.folder || "?") +
+        (c.session ? ` · ${c.session.containerStatus === "running" ? "container awake" : "container napping"}` : c.provisioned ? " · no session yet" : "");
+    } else {
+      const s = chatModeSession();
+      sub.textContent = s ? `${s.channelType} · ${s.platformId}` : "";
+    }
+  }
+  const unprov = $("#unprovbtn");
+  if (unprov) unprov.hidden = !(c.mode === "webui" && c.provisioned);
+  const canSend = !(c.mode === "webui" && c.provisioned === false);
+  const input = $("#chatinput"), sendb = $("#sendbtn");
+  if (input) input.disabled = !canSend;
+  if (sendb) sendb.disabled = !canSend;
+
+  if (c.mode === "webui" && c.provisioned === false) {
+    if (c.sig === "setup") return;
+    c.sig = "setup";
+    log.innerHTML = chatSetupCard(g);
+    return;
+  }
+  if (!c.loaded) {
+    if (c.sig !== "loading") { c.sig = "loading"; log.innerHTML = `<div class="chatsetup"><div class="h">Opening the line…</div></div>`; }
+    return;
+  }
+
+  const msgs = c.messages.concat(c.pending.map(p => ({ role: "operator", text: p.text, time: p.time, pending: true })));
+  msgs.sort((a, b) => String(a.time).localeCompare(String(b.time)));
+  const last = msgs[msgs.length - 1];
+  const thinking = !!last && last.role !== "agent" && Date.now() - new Date(last.time).getTime() < 10 * 60e3;
+  const sig = `${c.mode}:${msgs.length}:${last ? last.time + last.role + (last.pending ? "p" : "") : ""}:${thinking}`;
+  if (c.sig === sig) return;
+  c.sig = sig;
+
+  const nearBottom = !log.childElementCount || log.scrollHeight - log.scrollTop - log.clientHeight < 90;
+  let html = "", prevDay = "";
+  if (!msgs.length) {
+    html = `<div class="chatsetup"><div class="h">No messages yet — say hi!${c.mode === "webui" ? " The first reply can take a minute or two while the container wakes up." : ""}</div></div>`;
+  }
+  for (const m of msgs) {
+    const d = new Date(m.time);
+    const day = isNaN(d) ? "" : d.toDateString();
+    if (day && day !== prevDay) { prevDay = day; html += `<div class="daysep">${esc(fmtDay(d))}</div>`; }
+    const cls = m.role === "operator" ? "op" : m.role === "agent" ? "ag" : "us";
+    html += `<div class="msg ${cls}${m.pending ? " pending" : ""}">` +
+      (m.role === "user" && m.sender ? `<span class="ms">${esc(m.sender)}</span>` : "") +
+      `<div class="bub">${esc(m.text)}</div>` +
+      (m.sentTo ? `<span class="mis">↪ delivered to ${esc(m.sentTo)}</span>` : "") +
+      `<span class="mt">${m.pending ? "sending…" : esc(fmtClock(d))}</span></div>`;
+  }
+  if (thinking) {
+    html += `<div class="msg ag typing"><div class="bub" role="status" aria-label="${esc(g.name)} is thinking"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div><span class="mt">${esc(g.name)} is thinking…</span></div>`;
+  }
+  log.innerHTML = html;
+  if (nearBottom) log.scrollTop = log.scrollHeight;
+}
+
+async function provisionChat() {
+  const c = S.chat; if (!c) return;
+  const btn = $("#provbtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Setting up…"; }
+  let res;
+  try { res = await api("/api/chat/provision", { method: "POST", body: JSON.stringify({ agentGroupId: c.ag }) }); }
+  catch (e) { res = { ok: false, error: { message: e.message } }; }
+  toast(res.ok, res.ok ? `Private line to ${chatAgent().name} is ready` : "Setup failed",
+    res.ok ? "" : res.error?.message, res.ok ? (res.data.cmds || []).join("  ·  ") : res.cmd);
+  if (S.chat !== c) return;
+  if (res.ok) {
+    await Promise.all([loadList("messaging-groups", true), loadList("wirings", true)]);
+    c.provisioned = true; c.sig = "";
+    renderChatLog();
+    chatPoll(true);
+  } else if (btn) { btn.disabled = false; btn.innerHTML = `${ico("zap")} Set up private line`; }
+}
+
+function unprovisionChat() {
+  const c = S.chat; if (!c) return;
+  const g = chatAgent();
+  confirmModal(`Remove the private line to ${g.name}?`,
+    `Deletes the webui:${g.folder} wiring and reply destination via ncl (and the messaging group too, unless a session still references it — then it's kept, disconnected). Transcripts on disk are not touched; setting the line up again reconnects them.`,
+    () => api("/api/chat/unprovision", { method: "POST", body: JSON.stringify({ agentGroupId: c.ag }) }),
+    async () => {
+      await Promise.all([loadList("messaging-groups", true), loadList("wirings", true)]);
+      if (S.chat === c) { c.provisioned = false; c.session = null; c.messages = []; c.pending = []; c.sig = ""; renderChatLog(); updateChatBanner(); }
+    }, "Remove private line");
+}
+
+function autoGrow(ta) { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 140) + "px"; }
+function composerKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#composer").requestSubmit(); }
+}
+
+async function chatSubmit(e) {
+  e.preventDefault();
+  const c = S.chat; if (!c) return;
+  if (c.mode === "webui" && !c.provisioned) return;
+  const ta = $("#chatinput");
+  const text = ta.value.trim();
+  if (!text) return;
+  const now = Date.now();
+  const p = { text, time: new Date(now).toISOString(), minTime: new Date(now - 120e3).toISOString() };
+  c.pending.push(p); c.sig = "";
+  ta.value = ""; autoGrow(ta);
+  renderChatLog();
+  let body;
+  if (c.mode === "webui") body = { agentGroupId: c.ag, text };
+  else {
+    const s = chatModeSession();
+    if (!s) { c.pending = c.pending.filter(x => x !== p); c.sig = ""; renderChatLog(); toast(false, "Session not loaded yet", "Give it a second and try again."); return; }
+    body = { text, target: { channelType: s.channelType, platformId: s.platformId, threadId: s.threadId ?? null } };
+  }
+  let res;
+  try { res = await api("/api/chat/send", { method: "POST", body: JSON.stringify(body) }); }
+  catch (err) { res = { ok: false, error: { message: err.message } }; }
+  if (S.chat !== c) return;
+  if (!res.ok) {
+    c.pending = c.pending.filter(x => x !== p); c.sig = "";
+    ta.value = text; autoGrow(ta);
+    toast(false, "Message not sent", res.error?.message, res.cmd);
+    renderChatLog();
+    return;
+  }
+  setTimeout(() => chatPoll(true), 700);
+}
+
+/* =============================== boot ================================ */
+(function initTheme() {
+  const stored = localStorage.getItem("ncl_dash_theme");
+  const t = stored || (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  applyTheme(t);
+})();
+$("#tok").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+// Keep the chat composer above the on-screen keyboard on mobile: expose the
+// keyboard height as --kb, consumed by .chatwrap.full's bottom inset.
+if (window.visualViewport) {
+  const vvKb = () => {
+    const kb = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+    document.documentElement.style.setProperty("--kb", kb + "px");
+  };
+  window.visualViewport.addEventListener("resize", vvKb);
+  window.visualViewport.addEventListener("scroll", vvKb);
+}
+(async function boot() {
+  renderNav();
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const hashTok = hash.get("token");
+  if (hashTok) {
+    history.replaceState(null, "", location.pathname);
+    $("#tok").value = hashTok.trim();
+    await doLogin();
+    return;
+  }
+  if (S.token) {
+    $("#tok").value = S.token;
+    await doLogin();
+  }
+})();
+</script>
+</body>
+</html>

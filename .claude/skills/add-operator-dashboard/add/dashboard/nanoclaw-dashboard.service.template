@@ -1,0 +1,20 @@
+# systemd user unit for the NanoClaw operator dashboard.
+# Rendered by /add-operator-dashboard — placeholders are filled at install time:
+#   __NANOCLAW_DIR__  absolute path to the NanoClaw checkout
+#   __BIND_HOST__     bind address (127.0.0.1 or a tailnet/LAN IP; never 0.0.0.0)
+#   __NODE_DIR__      directory containing the node binary
+[Unit]
+Description=NanoClaw operator dashboard
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env bash __NANOCLAW_DIR__/dashboard/start.sh
+WorkingDirectory=__NANOCLAW_DIR__/dashboard
+Restart=on-failure
+RestartSec=3
+Environment=NCL_DASH_HOST=__BIND_HOST__
+Environment=PATH=__NODE_DIR__:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target
