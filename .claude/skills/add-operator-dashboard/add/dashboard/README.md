@@ -51,20 +51,26 @@ the dashboard directory lives outside the checkout it should operate).
 
 ## Install as a systemd user service (Linux)
 
+The unit name carries the install slug (like the host service) so two
+NanoClaw copies on one box get independent dashboard units. Run from the
+repo root:
+
 ```bash
+source setup/lib/install-slug.sh
+UNIT="nanoclaw-dashboard-$(_nanoclaw_install_slug)"
 mkdir -p ~/.config/systemd/user
 sed -e "s|__NANOCLAW_DIR__|$(pwd)|g" \
     -e "s|__BIND_HOST__|127.0.0.1|g" \
     -e "s|__NODE_DIR__|$(dirname "$(command -v node)")|g" \
     dashboard/nanoclaw-dashboard.service.template \
-    > ~/.config/systemd/user/nanoclaw-dashboard.service
+    > ~/.config/systemd/user/"$UNIT".service
 systemctl --user daemon-reload
-systemctl --user enable --now nanoclaw-dashboard
-systemctl --user status nanoclaw-dashboard
+systemctl --user enable --now "$UNIT"
+systemctl --user status "$UNIT"
 loginctl enable-linger "$USER"    # keep it running after logout (if not already)
 ```
 
-Logs: `journalctl --user -u nanoclaw-dashboard -f`
+Logs: `journalctl --user -u "$UNIT" -f`
 
 ## API
 

@@ -63,6 +63,11 @@ node dashboard/test/smoke.test.mjs
 
 Expect `smoke: all N checks passed`.
 
+Note what each validation leg guards: the smoke test runs against a **stub**
+`ncl`, so it proves auth enforcement and allowlist behavior in isolation — it
+does NOT prove the dashboard can reach the live install. That is what step 6's
+authenticated `curl` is for; don't skip it.
+
 ### 3. Choose a bind address
 
 Default is `127.0.0.1` (same-machine browser or SSH tunnel only). To reach it
@@ -88,26 +93,39 @@ needs the host's socket).
 
 ### 5. (Optional, Linux) Install as a systemd user service
 
+The unit name is suffixed with the install slug (same convention as the host
+service), so two NanoClaw copies on one box get independent dashboard units.
+Run from the repo root:
+
 ```bash
+source setup/lib/install-slug.sh
+UNIT="nanoclaw-dashboard-$(_nanoclaw_install_slug)"
 mkdir -p ~/.config/systemd/user
 sed -e "s|__NANOCLAW_DIR__|$(pwd)|g" \
     -e "s|__BIND_HOST__|<bind-host>|g" \
     -e "s|__NODE_DIR__|$(dirname "$(command -v node)")|g" \
     dashboard/nanoclaw-dashboard.service.template \
-    > ~/.config/systemd/user/nanoclaw-dashboard.service
+    > ~/.config/systemd/user/"$UNIT".service
 systemctl --user daemon-reload
-systemctl --user enable --now nanoclaw-dashboard
+systemctl --user enable --now "$UNIT"
 loginctl enable-linger "$USER"    # keep it running after logout
 ```
+
+(On a second install, also pick a distinct port range via `NCL_DASH_PORT` —
+`start.sh` walks upward from it, but starting both at 8787 makes which
+dashboard got which port a matter of boot order.)
 
 On macOS there is no unit template — run `dashboard/start.sh` under your
 preferred supervisor (launchd plist, tmux, `nohup`).
 
 ### 6. Verify
 
+This is the leg the smoke test can't cover: the authenticated call exercises
+the real `ncl` → host-socket path, so it fails if the host service is down or
+`NCL_BIN` resolves wrong.
+
 ```bash
-curl -fsS http://<bind-host>:<port>/api/health                        # 200
-curl -s -o /dev/null -w '%{http_code}\n' http://<bind-host>:<port>/api/list/groups   # 401 (no token)
+curl -s -o /dev/null -w '%{http_code}\n' http://<bind-host>:<port>/api/health       # 401 (no token — auth is on)
 curl -fsS -H "Authorization: Bearer $(cat dashboard/.token)" \
   http://<bind-host>:<port>/api/list/groups                           # live groups JSON
 ```
