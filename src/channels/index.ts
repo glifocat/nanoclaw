@@ -7,3 +7,8 @@
 // self-registration import below.
 
 import './cli.js';
+import './web.js';
+import './telegram.js';
+
+// mattermost
+import './mattermost.js';

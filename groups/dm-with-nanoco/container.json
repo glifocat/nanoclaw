@@ -1,0 +1,16 @@
+{
+  "mcpServers": {},
+  "packages": {
+    "apt": [
+      "cowsay"
+    ],
+    "npm": []
+  },
+  "imageTag": "nanoclaw-agent-v2-ec74ae7c:ag-1784898056256-h0de86",
+  "additionalMounts": [],
+  "skills": "all",
+  "provider": "opencode",
+  "groupName": "Spark Gambi",
+  "assistantName": "Spark Gambi",
+  "agentGroupId": "ag-1784898056256-h0de86"
+}

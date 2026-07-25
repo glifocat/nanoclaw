@@ -1,0 +1,13 @@
+{
+  "mcpServers": {},
+  "packages": {
+    "apt": [],
+    "npm": []
+  },
+  "additionalMounts": [],
+  "skills": "all",
+  "provider": "opencode",
+  "groupName": "vercel-dev-expert",
+  "assistantName": "vercel-dev-expert",
+  "agentGroupId": "ag-1784884587036-i5krac"
+}

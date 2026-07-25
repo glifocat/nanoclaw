@@ -159,8 +159,9 @@ function ensureServer(): void {
     }
   });
 
-  server.listen(port, '0.0.0.0', () => {
-    log.info('Webhook server started', { port, adapters: [...routes.keys()] });
+  const host = process.env.WEBHOOK_HOST || '127.0.0.1';
+  server.listen(port, host, () => {
+    log.info('Webhook server started', { port, host, adapters: [...routes.keys()] });
   });
 }
 

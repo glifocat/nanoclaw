@@ -1,0 +1,13 @@
+{
+  "mcpServers": {},
+  "packages": {
+    "apt": [],
+    "npm": []
+  },
+  "additionalMounts": [],
+  "skills": "all",
+  "provider": "opencode",
+  "groupName": "Pi Harness Expert",
+  "assistantName": "Pi Harness Expert",
+  "agentGroupId": "ag-1784844156568-nagpvg"
+}

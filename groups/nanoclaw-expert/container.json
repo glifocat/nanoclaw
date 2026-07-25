@@ -1,0 +1,13 @@
+{
+  "mcpServers": {},
+  "packages": {
+    "apt": [],
+    "npm": []
+  },
+  "additionalMounts": [],
+  "skills": "all",
+  "provider": "opencode",
+  "groupName": "nanoclaw-expert",
+  "assistantName": "nanoclaw-expert",
+  "agentGroupId": "ag-1784958911112-se31tb"
+}

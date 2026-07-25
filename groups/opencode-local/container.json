@@ -1,0 +1,19 @@
+{
+  "mcpServers": {},
+  "packages": {
+    "apt": [],
+    "npm": [
+      "@mendable/firecrawl",
+      "firecrawl",
+      "cat-facts"
+    ]
+  },
+  "imageTag": "nanoclaw-agent-v2-ec74ae7c:ag-6e9d6f1b-77e1-4cbf-b86c-e9fd062a2c19",
+  "additionalMounts": [],
+  "skills": "all",
+  "provider": "opencode",
+  "groupName": "OpenCode Local",
+  "assistantName": "OpenCode Local",
+  "agentGroupId": "ag-6e9d6f1b-77e1-4cbf-b86c-e9fd062a2c19",
+  "model": "openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic"
+}

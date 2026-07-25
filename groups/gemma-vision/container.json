@@ -1,0 +1,14 @@
+{
+  "mcpServers": {},
+  "packages": {
+    "apt": [],
+    "npm": []
+  },
+  "additionalMounts": [],
+  "skills": "all",
+  "provider": "opencode",
+  "groupName": "Gemma Vision",
+  "assistantName": "Gemma Vision",
+  "agentGroupId": "ag-bc5ed1d7-17ea-43a5-a4ab-79045d252d61",
+  "model": "openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic"
+}
