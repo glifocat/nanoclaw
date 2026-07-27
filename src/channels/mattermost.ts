@@ -24,7 +24,7 @@ import { registerChannelAdapter } from './channel-registry.js';
  * mentions:'platform' — Mattermost delivers mention metadata on the `posted`
  * event rather than requiring name-regex matching.
  */
-const MATTERMOST_DEFAULTS: ChannelDefaults = {
+export const MATTERMOST_DEFAULTS: ChannelDefaults = {
   dm: { engageMode: 'pattern', engagePattern: '.', threads: false, unknownSenderPolicy: 'request_approval' },
   group: { engageMode: 'mention-sticky', threads: true, unknownSenderPolicy: 'request_approval' },
   mentions: 'platform',

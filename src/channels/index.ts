@@ -12,3 +12,6 @@ import './telegram.js';
 
 // mattermost
 import './mattermost.js';
+
+// mattermost second instance: Rocky
+import './mattermost-rocky.js';
