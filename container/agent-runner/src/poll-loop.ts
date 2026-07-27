@@ -6,7 +6,7 @@ import {
   markScriptSkipped,
   type MessageInRow,
 } from './db/messages-in.js';
-import { writeMessageOut, getMaxOutboundSeq } from './db/messages-out.js';
+import { writeMessageOut, getMaxOutboundSeq, getTurnSentTexts } from './db/messages-out.js';
 import { getInboundDb, touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
 import {
   clearContinuation,
@@ -739,6 +739,13 @@ export interface TaskMessageBlock {
   body: string;
 }
 
+/** Whitespace-insensitive form used to detect envelope bodies that echo a
+ *  tool send from the same turn. Content-preserving on purpose: only an
+ *  actually-identical text should count as a duplicate. */
+function normalizeForEcho(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
 export function dispatchResultText(
   text: string,
   routing: RoutingContext,
@@ -798,6 +805,20 @@ export function dispatchResultText(
       );
       pseudoToolSuppressed++;
       continue;
+    }
+    // Chat-session variant of the double-delivery class: models routinely
+    // repeat a caption they already sent via send_file/send_message as the
+    // <message> body, and the user sees the same text twice. A body that is
+    // a verbatim echo (modulo whitespace) of a tool send from this same turn
+    // is suppressed — the content already reached the user. Counted as sent:
+    // the turn delivered, so the re-wrap nudge must not fire.
+    if (routing.inReplyTo) {
+      const echo = normalizeForEcho(deliverable);
+      if (getTurnSentTexts(routing.inReplyTo).some((t) => normalizeForEcho(t) === echo)) {
+        log(`<message to="${toName}"> body duplicates a tool send from this turn — suppressed`);
+        sent++;
+        continue;
+      }
     }
     sendToDestination(dest, deliverable, routing);
     sent++;

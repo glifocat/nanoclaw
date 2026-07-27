@@ -155,3 +155,28 @@ export function getUndeliveredMessages(): MessageOutRow[] {
     )
     .all() as MessageOutRow[];
 }
+
+/**
+ * Texts already written out this turn by explicit MCP tool sends
+ * (send_message bodies, send_file captions), keyed by the batch's
+ * in_reply_to. Lets the envelope dispatcher recognize a <message> body that
+ * is a verbatim echo of a send the agent already made — the chat-session
+ * variant of the double-delivery class.
+ */
+export function getTurnSentTexts(inReplyTo: string): string[] {
+  const rows = getOutboundDb()
+    .prepare('SELECT content FROM messages_out WHERE in_reply_to = $in_reply_to')
+    .all({ $in_reply_to: inReplyTo }) as Array<{ content: string }>;
+  const texts: string[] = [];
+  for (const row of rows) {
+    try {
+      const content = JSON.parse(row.content) as { text?: unknown };
+      if (typeof content.text === 'string' && content.text.trim()) {
+        texts.push(content.text);
+      }
+    } catch {
+      // non-JSON content rows are not tool sends
+    }
+  }
+  return texts;
+}
