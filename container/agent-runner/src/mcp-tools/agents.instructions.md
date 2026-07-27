@@ -7,6 +7,7 @@
 - Creates a new agent with its own container, workspace, and session. Your `instructions` string becomes its `instructions.prepend.md` — its standing role and personality.
 - The agent's `name` becomes a destination on both sides: you address it via `send_message({ to: "<name>", ... })`, and its replies arrive as inbound messages with `from="<name>"`.
 - Each agent has its own persistent workspace under `groups/<folder>/` — memory, conversation history, and notes all survive across sessions. This is a full standalone agent, not a stateless sub-query.
+- **Filesystems are NOT shared.** A spawned agent gets its own group directory and cannot read the caller's `/workspace/agent/` files (nor vice versa). Handoffs involving files on disk do not work — the other agent will simply not find the file, however you phrase the path. Anything it needs must fit in the message text, and never paste file contents or encodings (base64) into a message to work around this.
 - **Fire-and-forget:** the call returns immediately without waiting for the agent to confirm it's ready. Messages you send will queue until it's up.
 
 ### When to use
