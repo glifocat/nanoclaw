@@ -1,0 +1,13 @@
+{
+  "mcpServers": {},
+  "packages": {
+    "apt": [],
+    "npm": []
+  },
+  "additionalMounts": [],
+  "skills": "all",
+  "provider": "opencode",
+  "groupName": "Rocky",
+  "assistantName": "Rocky",
+  "agentGroupId": "ag-1785142030750-ovaolm"
+}
