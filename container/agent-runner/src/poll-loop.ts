@@ -550,8 +550,12 @@ export async function processQuery(
             // problem); a repeat after the nudge delivers the raw turn text
             // marked with FALLBACK_PREFIX so the user is never left in
             // silence believing the action happened.
-            const pseudoSuppressedTurn =
-              pseudoToolSuppressed > 0 && sent === 0 && !routing.taskRun;
+            // No sent === 0 gate on the nudge: a mixed turn (prose envelope
+            // delivered + pseudo-tool envelope suppressed) still means the
+            // model believes it performed an action that never happened —
+            // it must be told either way. Only the marked-raw fallback stays
+            // gated on nothing-else-delivered.
+            const pseudoSuppressedTurn = pseudoToolSuppressed > 0 && !routing.taskRun;
             const willRetryPseudo = pseudoSuppressedTurn && !pseudoToolNudged;
             const willRetryWrapping = hasUnwrapped && !unwrappedNudged && !willRetryPseudo;
             // Never-silent fallback: a chat turn that was already nudged once
@@ -566,14 +570,14 @@ export async function processQuery(
             const mcpDeliveredThisTurn = getMaxOutboundSeq() > outboundBaselineSeq;
             const willFallbackDeliver =
               (hasUnwrapped && unwrappedNudged && !routing.taskRun && sent === 0 && !mcpDeliveredThisTurn) ||
-              (pseudoSuppressedTurn && pseudoToolNudged && !mcpDeliveredThisTurn);
+              (pseudoSuppressedTurn && pseudoToolNudged && sent === 0 && !mcpDeliveredThisTurn);
             notifyExchangeComplete(onExchangeComplete, {
               prompt: archivePrompts[0] ?? initialPrompt,
               result: event.text,
               continuation: queryContinuation ?? initialContinuation,
               status: willFallbackDeliver
                 ? 'fallback'
-                : hasUnwrapped || willRetryTaskBlocks || willRetryPseudo
+                : hasUnwrapped || willRetryTaskBlocks || (willRetryPseudo && sent === 0)
                   ? 'undelivered'
                   : 'completed',
             });
@@ -583,9 +587,9 @@ export async function processQuery(
             if (willRetryPseudo) {
               pseudoToolNudged = true;
               query.push(
-                `<system>Your reply contained a made-up tool-call tag written as plain text (like <call:...>). ` +
-                  `Nothing was executed and nothing was delivered to the user. ` +
-                  `To run a command or schedule anything, invoke your REAL tools (e.g. the bash tool) — never write tool-call syntax inside a message. ` +
+                `<system>Part of your reply was a made-up tool-call tag written as plain text (like <call:...> or <nanoclaw_...>). ` +
+                  `That part was NOT executed and NOT delivered — the action you described did not happen. ` +
+                  `To perform an action, invoke your REAL tools — never write tool-call syntax inside a message. ` +
                   `Redo the action with the proper tool now, then confirm the outcome in plain text wrapped in <message to="name">...</message> blocks.</system>`,
               );
             }

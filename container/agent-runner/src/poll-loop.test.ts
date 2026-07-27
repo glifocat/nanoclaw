@@ -494,6 +494,28 @@ describe('pseudo-tool markup suppression (PF3)', () => {
     expect(JSON.parse(out[0].content).text).toStartWith(FALLBACK_PREFIX);
   });
 
+  it('nudges on a mixed turn: prose envelope delivered, pseudo-tool envelope suppressed', async () => {
+    // The live failure shape: two <message> blocks in one result — the first
+    // plain prose, the second nothing but an invented tool tag. The prose
+    // must deliver, the tag must not, and the corrective nudge must still
+    // fire even though the turn was not silent.
+    seedDestination('local-web');
+    const { query, pushes } = makeResultQuery({
+      type: 'result',
+      text:
+        `<message to="local-web">Sure, making a card now.</message>` +
+        `<message to="local-web"><nanoclaw_send_card card="{&quot;title&quot;: &quot;Mock&quot;}"></message>`,
+    });
+
+    await processQuery(query, ERR_ROUTING, ['m1'], 'opencode', undefined, 'prompt', undefined);
+
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0].content).text).toBe('Sure, making a card now.');
+    expect(pushes).toHaveLength(1);
+    expect(pushes[0]).toContain('made-up tool-call tag');
+  });
+
   it('delivers prose mixed with markup untouched', async () => {
     seedDestination('local-web');
     const mixed = `Scheduled! ${LEAK}`;
