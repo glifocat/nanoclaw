@@ -55,12 +55,7 @@ export interface CardResolvedFrame {
   actor: string;
 }
 
-export type ServerFrame =
-  | ReadyFrame
-  | TypingFrame
-  | MessageFrame
-  | CardFrame
-  | CardResolvedFrame;
+export type ServerFrame = ReadyFrame | TypingFrame | MessageFrame | CardFrame | CardResolvedFrame;
 
 // ---- Client -> server frames ----
 

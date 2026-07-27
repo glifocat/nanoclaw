@@ -56,26 +56,26 @@ registerProviderContainerConfig('opencode', (ctx) => {
   // file can never stop a spawn.
   const readJson = (file: string): Record<string, unknown> | undefined => {
     try {
-      return JSON.parse(fs.readFileSync(file, "utf8"));
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch {
       return undefined;
     }
   };
-  const groupConfig = readJson(path.join(ctx.groupDir, "container.json"));
-  if (typeof groupConfig?.model === "string" && groupConfig.model) {
+  const groupConfig = readJson(path.join(ctx.groupDir, 'container.json'));
+  if (typeof groupConfig?.model === 'string' && groupConfig.model) {
     env.OPENCODE_MODEL = groupConfig.model;
   }
   const GROUP_ENV_ALLOWLIST = [
-    "OPENCODE_MODEL",
-    "OPENCODE_SMALL_MODEL",
-    "ANTHROPIC_BASE_URL",
-    "OPENCODE_MODEL_CONTEXT_LIMIT",
-    "OPENCODE_MODEL_OUTPUT_LIMIT",
-    "OPENCODE_MODEL_INPUT_MODALITIES",
+    'OPENCODE_MODEL',
+    'OPENCODE_SMALL_MODEL',
+    'ANTHROPIC_BASE_URL',
+    'OPENCODE_MODEL_CONTEXT_LIMIT',
+    'OPENCODE_MODEL_OUTPUT_LIMIT',
+    'OPENCODE_MODEL_INPUT_MODALITIES',
   ];
-  const groupEnv = readJson(path.join(ctx.groupDir, "provider-env.json"));
+  const groupEnv = readJson(path.join(ctx.groupDir, 'provider-env.json'));
   for (const [key, value] of Object.entries(groupEnv ?? {})) {
-    if (GROUP_ENV_ALLOWLIST.includes(key) && typeof value === "string") {
+    if (GROUP_ENV_ALLOWLIST.includes(key) && typeof value === 'string') {
       env[key] = value;
     }
   }
