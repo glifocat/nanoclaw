@@ -835,7 +835,14 @@ export function dispatchResultText(
 
   // In a task run, plain final text is the NORMAL ending (it becomes the run
   // log) — never treat it as an undelivered reply or nudge the agent to wrap it.
-  const hasUnwrapped = !routing.taskRun && sent === 0 && !!scratchpad;
+  // A result that is ONLY <internal> content still counts as unwrapped when
+  // nothing was sent: the model did a turn's worth of thinking and delivered
+  // nothing, which is exactly the case the re-wrap nudge exists for. (Observed
+  // repeatedly on a 26B local model: full analysis plan inside <internal>, no
+  // envelope, turn ends silent.) The fallback path still strips <internal>, so
+  // private content never leaks even if the nudge fails.
+  const hasUnwrapped =
+    !routing.taskRun && sent === 0 && (!!scratchpad || scratchpadParts.join('').trim().length > 0);
   if (hasUnwrapped) {
     log(`WARNING: agent output had no <message to="..."> blocks — nothing was sent`);
   }
