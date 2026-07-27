@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
 import { initTestSessionDb, closeSessionDb, getInboundDb } from './db/connection.js';
 import { getPendingMessages } from './db/messages-in.js';
-import { formatMessages, stripInternalTags, stripLegacyTaskContract } from './formatter.js';
+import { formatMessages, stripInternalTags, stripLegacyTaskContract, isPseudoToolMarkup } from './formatter.js';
 import { TIMEZONE, formatLocalTime } from './timezone.js';
 
 beforeEach(() => {
@@ -232,5 +232,55 @@ describe('stripInternalTags', () => {
     expect(stripInternalTags('<internal>thinking</internal>The answer is 42')).toBe(
       'The answer is 42',
     );
+  });
+});
+
+describe('isPseudoToolMarkup', () => {
+  it('matches the live call:bash leak verbatim', () => {
+    expect(
+      isPseudoToolMarkup(
+        `<call:bash command="ncl tasks create --name 'ping gavriel' --prompt 'Remind the user to ping Gavriel about testing the local models' --process-after '10:29:00'" description="Schedule a reminder for Gavriel in 5 minutes"/>`,
+      ),
+    ).toBe(true);
+  });
+
+  it('matches the live call:webfetch leak verbatim', () => {
+    expect(
+      isPseudoToolMarkup(
+        `<call:webfetch url="https://docs.nanoclaw.dev" format="markdown" description="Fetch content from nanoclaw docs to identify the website's purpose"/>`,
+      ),
+    ).toBe(true);
+  });
+
+  it('matches a paired tool_call tag with JSON payload', () => {
+    expect(isPseudoToolMarkup('<tool_call>{"name":"send_card","args":{}}</tool_call>')).toBe(true);
+  });
+
+  it('matches multiple tags separated by whitespace', () => {
+    expect(isPseudoToolMarkup('<call:bash command="ls"/>\n<call:bash command="pwd"/>')).toBe(true);
+  });
+
+  it('matches a bare opening tag (truncated hallucination)', () => {
+    expect(isPseudoToolMarkup('<call:bash command="ls -la">')).toBe(true);
+  });
+
+  it('does not match prose mixed with markup', () => {
+    expect(isPseudoToolMarkup('Done! <call:bash command="ls"/> executed.')).toBe(false);
+  });
+
+  it('does not match plain prose', () => {
+    expect(isPseudoToolMarkup('The reminder is set for 10:29.')).toBe(false);
+  });
+
+  it('does not match fenced code blocks containing tags', () => {
+    expect(isPseudoToolMarkup('```xml\n<call:bash command="ls"/>\n```')).toBe(false);
+  });
+
+  it('does not match empty input', () => {
+    expect(isPseudoToolMarkup('')).toBe(false);
+  });
+
+  it('does not match a comparison expression', () => {
+    expect(isPseudoToolMarkup('<p>a</p> and 3 < 5 is true')).toBe(false);
   });
 });

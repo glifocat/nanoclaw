@@ -330,3 +330,34 @@ function escapeXml(str: string): string {
 export function stripInternalTags(text: string): string {
   return text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
 }
+
+/**
+ * True when agent output is nothing but hallucinated tool-call markup.
+ * Local models sometimes invent an XML-ish call syntax in message text
+ * instead of invoking a real tool (seen live: a reply that was exactly
+ * `<call:bash command="..."/>`). Nothing executes such tags, and delivering
+ * one verbatim tells the user work happened that never did.
+ *
+ * A deliverable consisting ONLY of XML-like elements — one or more,
+ * self-closing, paired, or a bare opening tag (truncated hallucination),
+ * any whitespace between — counts. Prose mixed with markup does not, and
+ * fenced code blocks never match (the fence makes the text start with
+ * a backtick, not '<').
+ */
+export function isPseudoToolMarkup(text: string): boolean {
+  const NAME = '[A-Za-z_][\\w.:-]*';
+  const ATTRS = `(?:\\s+(?:[^<>"']|"[^"]*"|'[^']*')*)?`;
+  // Alternatives: self-closing tag | paired tag with any content | bare
+  // opening tag that ends the remaining text.
+  const ELEMENT = new RegExp(
+    `^(?:<(?:${NAME})${ATTRS}\\s*/>|<(${NAME})${ATTRS}>[\\s\\S]*?</\\1\\s*>|<(?:${NAME})${ATTRS}>$)`,
+  );
+  let t = text.trim();
+  if (!t.startsWith('<')) return false;
+  while (t.length > 0) {
+    const m = ELEMENT.exec(t);
+    if (!m || m[0].length === 0) return false;
+    t = t.slice(m[0].length).trimStart();
+  }
+  return true;
+}

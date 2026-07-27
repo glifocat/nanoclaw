@@ -23,6 +23,7 @@ import {
   isClearCommand,
   isRunnerCommand,
   stripInternalTags,
+  isPseudoToolMarkup,
   type RoutingContext,
 } from './formatter.js';
 import { isUploadTraceCommand, uploadTrace } from './upload-trace.js';
@@ -356,6 +357,10 @@ export async function processQuery(
   // Once-per-turn guard for the task-run "<message> block was not delivered"
   // nudge — mirrors unwrappedNudged for chat turns.
   let taskBlockNudged = false;
+  // Once-per-query guard for the "you wrote a fake tool-call tag" nudge —
+  // mirrors unwrappedNudged. A second pseudo-tool-only reply after the nudge
+  // falls back to marked raw delivery instead of going silent.
+  let pseudoToolNudged = false;
   // Snapshot of the outbound seq at the start of the current turn. MCP tools
   // (send_message, send_file) write outbound rows directly and never touch the
   // in-process `sent` counter, so this is the only in-loop signal that the
@@ -448,6 +453,7 @@ export async function processQuery(
         log(`Pushing ${keep.length} follow-up message(s) into active query`);
         unwrappedNudged = false;
         taskBlockNudged = false;
+        pseudoToolNudged = false;
         outboundBaselineSeq = getMaxOutboundSeq();
         query.push(prompt, extractAttachments(keep));
         archivePrompts.push(prompt);
@@ -513,7 +519,10 @@ export async function processQuery(
         // at all — either way the turn is finished.
         markCompleted(initialBatchIds);
         if (event.text) {
-          const { sent, hasUnwrapped, taskBlocks } = dispatchResultText(event.text, routing);
+          const { sent, hasUnwrapped, taskBlocks, pseudoToolSuppressed } = dispatchResultText(
+            event.text,
+            routing,
+          );
           const willRetryTaskBlocks = shouldNudgeTaskBlocks(routing.taskRun, taskBlocks, taskBlockNudged);
           // One-door task delivery: the final text becomes the run log entry
           // while explicit append-log calls remain optional additive notes.
@@ -535,7 +544,16 @@ export async function processQuery(
             });
             archivePrompts.shift();
           } else {
-            const willRetryWrapping = hasUnwrapped && !unwrappedNudged;
+            // Pseudo-tool suppression recovery: first offense gets a specific
+            // "use your real tools" nudge (takes precedence over the generic
+            // re-wrap nudge — the wrapping was fine, the content was the
+            // problem); a repeat after the nudge delivers the raw turn text
+            // marked with FALLBACK_PREFIX so the user is never left in
+            // silence believing the action happened.
+            const pseudoSuppressedTurn =
+              pseudoToolSuppressed > 0 && sent === 0 && !routing.taskRun;
+            const willRetryPseudo = pseudoSuppressedTurn && !pseudoToolNudged;
+            const willRetryWrapping = hasUnwrapped && !unwrappedNudged && !willRetryPseudo;
             // Never-silent fallback: a chat turn that was already nudged once
             // and STILL came back with no <message> envelope would otherwise be
             // dropped as scratchpad, leaving the user staring at silence. Deliver
@@ -547,19 +565,29 @@ export async function processQuery(
             // for intent.
             const mcpDeliveredThisTurn = getMaxOutboundSeq() > outboundBaselineSeq;
             const willFallbackDeliver =
-              hasUnwrapped && unwrappedNudged && !routing.taskRun && sent === 0 && !mcpDeliveredThisTurn;
+              (hasUnwrapped && unwrappedNudged && !routing.taskRun && sent === 0 && !mcpDeliveredThisTurn) ||
+              (pseudoSuppressedTurn && pseudoToolNudged && !mcpDeliveredThisTurn);
             notifyExchangeComplete(onExchangeComplete, {
               prompt: archivePrompts[0] ?? initialPrompt,
               result: event.text,
               continuation: queryContinuation ?? initialContinuation,
               status: willFallbackDeliver
                 ? 'fallback'
-                : hasUnwrapped || willRetryTaskBlocks
+                : hasUnwrapped || willRetryTaskBlocks || willRetryPseudo
                   ? 'undelivered'
                   : 'completed',
             });
             if (willFallbackDeliver) {
               deliverFallbackResult(event.text, routing);
+            }
+            if (willRetryPseudo) {
+              pseudoToolNudged = true;
+              query.push(
+                `<system>Your reply contained a made-up tool-call tag written as plain text (like <call:...>). ` +
+                  `Nothing was executed and nothing was delivered to the user. ` +
+                  `To run a command or schedule anything, invoke your REAL tools (e.g. the bash tool) — never write tool-call syntax inside a message. ` +
+                  `Redo the action with the proper tool now, then confirm the outcome in plain text wrapped in <message to="name">...</message> blocks.</system>`,
+              );
             }
             if (willRetryWrapping) {
               unwrappedNudged = true;
@@ -582,7 +610,7 @@ export async function processQuery(
             // A retry result (wrapping or task-block nudge) answers the SAME
             // user prompt — keep it queued so the retry archives against it,
             // not the nudge text.
-            if (!willRetryWrapping && !willRetryTaskBlocks) archivePrompts.shift();
+            if (!willRetryWrapping && !willRetryTaskBlocks && !willRetryPseudo) archivePrompts.shift();
           }
         } else archivePrompts.shift();
       }
@@ -710,7 +738,7 @@ export interface TaskMessageBlock {
 export function dispatchResultText(
   text: string,
   routing: RoutingContext,
-): { sent: number; hasUnwrapped: boolean; taskBlocks: TaskMessageBlock[] } {
+): { sent: number; hasUnwrapped: boolean; taskBlocks: TaskMessageBlock[]; pseudoToolSuppressed: number } {
   const MESSAGE_RE = /<message\s+to="([^"]+)"\s*>([\s\S]*?)<\/message>/g;
 
   let match: RegExpExecArray | null;
@@ -719,6 +747,7 @@ export function dispatchResultText(
   // "use send_message" nudge in processQuery.
   const taskBlocks: TaskMessageBlock[] = [];
   let lastIndex = 0;
+  let pseudoToolSuppressed = 0;
   const scratchpadParts: string[] = [];
 
   while ((match = MESSAGE_RE.exec(text)) !== null) {
@@ -754,6 +783,18 @@ export function dispatchResultText(
       log(`<message to="${toName}"> contained only <internal> content — nothing delivered`);
       continue;
     }
+    // A body that is nothing but hallucinated tool-call markup (e.g.
+    // `<call:bash .../>`) is never delivered: no tool executed, and the raw
+    // tag reads to the user as work done. Suppress it here; the caller
+    // nudges the agent to redo the action with its real tools, so the turn
+    // does not end silent.
+    if (isPseudoToolMarkup(deliverable)) {
+      log(
+        `<message to="${toName}"> contained only pseudo-tool markup — suppressed: ${deliverable.slice(0, 200)}`,
+      );
+      pseudoToolSuppressed++;
+      continue;
+    }
     sendToDestination(dest, deliverable, routing);
     sent++;
   }
@@ -773,7 +814,7 @@ export function dispatchResultText(
   if (hasUnwrapped) {
     log(`WARNING: agent output had no <message to="..."> blocks — nothing was sent`);
   }
-  return { sent, hasUnwrapped, taskBlocks };
+  return { sent, hasUnwrapped, taskBlocks, pseudoToolSuppressed };
 }
 
 /**

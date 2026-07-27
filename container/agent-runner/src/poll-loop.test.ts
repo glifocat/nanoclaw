@@ -4,7 +4,7 @@ import { initTestSessionDb, closeSessionDb, getInboundDb, getOutboundDb } from '
 import { getPendingMessages, markCompleted } from './db/messages-in.js';
 import { getUndeliveredMessages } from './db/messages-out.js';
 import { formatMessages, extractRouting } from './formatter.js';
-import { isCorruptionError, processQuery } from './poll-loop.js';
+import { isCorruptionError, processQuery, FALLBACK_PREFIX } from './poll-loop.js';
 import { MockProvider } from './providers/mock.js';
 import type { AgentQuery, ProviderEvent } from './providers/types.js';
 
@@ -435,6 +435,79 @@ describe('error result with no <message> envelope', () => {
     expect(getUndeliveredMessages()).toHaveLength(0);
     expect(pushes).toHaveLength(1);
     expect(pushes[0]).toContain('was not delivered');
+  });
+});
+
+describe('pseudo-tool markup suppression (PF3)', () => {
+  const LEAK = `<call:bash command="ncl tasks create --name 'ping gavriel'" description="Schedule a reminder"/>`;
+
+  function seedDestination(name: string): void {
+    getInboundDb()
+      .prepare(
+        `INSERT INTO destinations (name, display_name, type, channel_type, platform_id, agent_group_id)
+         VALUES (?, ?, 'channel', 'mattermost', 'chan-1', NULL)`,
+      )
+      .run(name, name);
+  }
+
+  it('suppresses an enveloped pseudo-tool-only reply and nudges toward real tools', async () => {
+    seedDestination('local-web');
+    const { query, pushes } = makeResultQuery({
+      type: 'result',
+      text: `<message to="local-web">${LEAK}</message>`,
+    });
+
+    await processQuery(query, ERR_ROUTING, ['m1'], 'opencode', undefined, 'prompt', undefined);
+
+    // The raw tag must never reach the channel...
+    expect(getUndeliveredMessages()).toHaveLength(0);
+    // ...and the agent gets one specific corrective nudge, not the generic
+    // re-wrap one (the wrapping was fine).
+    expect(pushes).toHaveLength(1);
+    expect(pushes[0]).toContain('made-up tool-call tag');
+    expect(pushes[0]).not.toContain('was not wrapped');
+  });
+
+  it('falls back to marked raw delivery when the nudged retry repeats the markup', async () => {
+    seedDestination('local-web');
+    const pushes: string[] = [];
+    async function* events(): AsyncGenerator<ProviderEvent> {
+      yield { type: 'init', continuation: 's1' };
+      yield { type: 'result', text: `<message to="local-web">${LEAK}</message>` };
+      yield { type: 'result', text: `<message to="local-web">${LEAK}</message>` };
+    }
+    const query: AgentQuery = {
+      push: (m: string) => {
+        pushes.push(m);
+      },
+      end: () => {},
+      events: events(),
+      abort: () => {},
+    };
+
+    await processQuery(query, ERR_ROUTING, ['m1'], 'opencode', undefined, 'prompt', undefined);
+
+    expect(pushes).toHaveLength(1);
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    // Marked as undelivered-raw, never presented as a normal reply.
+    expect(JSON.parse(out[0].content).text).toStartWith(FALLBACK_PREFIX);
+  });
+
+  it('delivers prose mixed with markup untouched', async () => {
+    seedDestination('local-web');
+    const mixed = `Scheduled! ${LEAK}`;
+    const { query, pushes } = makeResultQuery({
+      type: 'result',
+      text: `<message to="local-web">${mixed}</message>`,
+    });
+
+    await processQuery(query, ERR_ROUTING, ['m1'], 'opencode', undefined, 'prompt', undefined);
+
+    expect(pushes).toHaveLength(0);
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0].content).text).toBe(mixed);
   });
 });
 
