@@ -233,6 +233,28 @@ describe('stripInternalTags', () => {
       'The answer is 42',
     );
   });
+
+  it('strips an unterminated internal tag that starts the reply (PF2b)', () => {
+    expect(stripInternalTags('<internal>\nthinking with no closing tag ever')).toBe('');
+  });
+
+  it('strips from a newline-boundary unterminated internal tag to the end (PF2b)', () => {
+    expect(
+      stripInternalTags('The answer is 42.\n<internal>now the user probably wants'),
+    ).toBe('The answer is 42.');
+  });
+
+  it('leaves a mid-sentence prose mention of the tag alone (PF2b boundary gate)', () => {
+    expect(stripInternalTags('wrap scratchpad in <internal> tags')).toBe(
+      'wrap scratchpad in <internal> tags',
+    );
+  });
+
+  it('handles a closed pair followed by an unterminated tag (PF2b)', () => {
+    expect(
+      stripInternalTags('<internal>a</internal>Answer.\n<internal>trailing thought'),
+    ).toBe('Answer.');
+  });
 });
 
 describe('isPseudoToolMarkup', () => {

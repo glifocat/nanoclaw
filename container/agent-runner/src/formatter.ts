@@ -328,7 +328,15 @@ function escapeXml(str: string): string {
  * own scratchpad/reasoning before a reply goes out over a channel.
  */
 export function stripInternalTags(text: string): string {
-  return text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+  // Closed pairs first, then an UNTERMINATED <internal> open tag: models
+  // sometimes drop the closing tag, and a bare open tag would otherwise
+  // leak everything after it. Gated to a block boundary (start of text or
+  // after a newline) so prose that merely mentions <internal> mid-sentence
+  // is left alone.
+  return text
+    .replace(/<internal>[\s\S]*?<\/internal>/g, '')
+    .replace(/(?:^|\n)[ \t]*<internal>[\s\S]*$/, '')
+    .trim();
 }
 
 /**
