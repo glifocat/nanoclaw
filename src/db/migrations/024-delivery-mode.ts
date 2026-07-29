@@ -11,7 +11,7 @@ import type { Migration } from './index.js';
  * delivery exactly.
  */
 export const migration024: Migration = {
-  version: 24,
+  version: 25,
   name: 'delivery-mode',
   up(db) {
     db.exec(`ALTER TABLE container_configs ADD COLUMN delivery_mode TEXT;`);

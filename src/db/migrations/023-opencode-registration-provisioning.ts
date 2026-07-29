@@ -12,7 +12,7 @@ import type { Migration } from './index.js';
  * connect-existing/reject behavior.
  */
 export const migration023: Migration = {
-  version: 23,
+  version: 24,
   name: 'opencode-registration-provisioning',
   up(db) {
     db.exec(`
