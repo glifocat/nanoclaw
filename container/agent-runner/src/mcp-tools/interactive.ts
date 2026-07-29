@@ -132,13 +132,25 @@ export const askUserQuestion: McpToolDefinition = {
 export const sendCard: McpToolDefinition = {
   tool: {
     name: 'send_card',
-    description: 'Send a structured card (interactive or display-only) to the current conversation.',
+    description:
+      'Send a display-only card to the current conversation. ALL card body content (lists, facts, summary lines) MUST go in card.children - a card without children renders as an empty shell on chat platforms. Buttons/actions are not delivered on chat channels; use ask_user_question for interactive buttons.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         card: {
           type: 'object',
-          description: 'Card structure with title, description, and optional children/actions',
+          description:
+            'Card content. Put the body in `children`; a title alone renders as an empty header.',
+          properties: {
+            title: { type: 'string', description: 'Card header' },
+            subtitle: { type: 'string', description: 'Secondary header line' },
+            children: {
+              type: 'array',
+              description:
+                'The card body - required for any card with content. Elements render in order: { text: string } for a line or bullet, or { title, subtitle, children } for a nested section.',
+              items: { type: 'object' },
+            },
+          },
         },
         fallbackText: { type: 'string', description: 'Text fallback for platforms without card support' },
       },
