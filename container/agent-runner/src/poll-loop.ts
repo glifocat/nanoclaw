@@ -23,6 +23,7 @@ import {
   isClearCommand,
   isRunnerCommand,
   stripInternalTags,
+  containsPseudoToolTag,
   isPseudoToolMarkup,
   type RoutingContext,
 } from './formatter.js';
@@ -831,6 +832,16 @@ export function dispatchResultText(
 
   if (scratchpad) {
     log(`[scratchpad] ${scratchpad.slice(0, 500)}${scratchpad.length > 500 ? '…' : ''}`);
+  }
+
+  // A tool-call-shaped tag in bare scratchpad is the same failure as a
+  // pseudo-tool envelope body — the model narrated an action that never
+  // executed — but with no envelope to suppress, it previously died here
+  // silently (a delivered envelope elsewhere in the turn keeps the re-wrap
+  // nudge quiet too). Count it so the caller's real-tools nudge fires.
+  if (scratchpad && containsPseudoToolTag(scratchpad)) {
+    log('[pseudo-tool in scratchpad] tool-call markup outside any envelope — counted for corrective nudge');
+    pseudoToolSuppressed++;
   }
 
   // In a task run, plain final text is the NORMAL ending (it becomes the run

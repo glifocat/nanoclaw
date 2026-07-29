@@ -5,7 +5,8 @@
     "npm": [
       "@mendable/firecrawl",
       "firecrawl",
-      "cat-facts"
+      "cat-facts",
+      "context7"
     ]
   },
   "imageTag": "nanoclaw-agent-v2-ec74ae7c:ag-6e9d6f1b-77e1-4cbf-b86c-e9fd062a2c19",

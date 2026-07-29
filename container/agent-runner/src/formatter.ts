@@ -369,3 +369,16 @@ export function isPseudoToolMarkup(text: string): boolean {
   }
   return true;
 }
+
+/**
+ * True when text CONTAINS a tool-call-shaped tag anywhere, as opposed to
+ * isPseudoToolMarkup which requires the whole text to be markup. Only the
+ * unambiguous hallucination shapes count — `<call:...>` and `<nanoclaw_...>`
+ * — so prose, examples, and ordinary XML never match. Used on the scratchpad
+ * path: a tool tag outside any envelope means the model believes it performed
+ * an action that never executed, and it must be told even though there was
+ * no envelope to suppress.
+ */
+export function containsPseudoToolTag(text: string): boolean {
+  return /<\s*(?:call:[\w.:-]+|nanoclaw_[\w-]+)(?:[\s>/]|$)/.test(text);
+}

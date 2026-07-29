@@ -34,7 +34,7 @@
     "@types/ws": "^8.18.1",
     "better-sqlite3": "11.10.0",
     "chat": "4.29.0",
-    "chat-adapter-mattermost": "file:/home/nanoco/mattermost-lab/chat-adapter-mattermost-0.0.4.tgz",
+    "chat-adapter-mattermost": "file:/home/nanoco/mattermost-lab/chat-adapter-mattermost-0.0.5.tgz",
     "cron-parser": "5.5.0",
     "kleur": "^4.1.5",
     "ws": "^8.21.1",

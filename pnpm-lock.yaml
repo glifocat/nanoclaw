@@ -30,8 +30,8 @@ importers:
         specifier: 4.29.0
         version: 4.29.0
       chat-adapter-mattermost:
-        specifier: file:/home/nanoco/mattermost-lab/chat-adapter-mattermost-0.0.4.tgz
-        version: file:../mattermost-lab/chat-adapter-mattermost-0.0.4.tgz
+        specifier: file:/home/nanoco/mattermost-lab/chat-adapter-mattermost-0.0.5.tgz
+        version: file:../mattermost-lab/chat-adapter-mattermost-0.0.5.tgz
       cron-parser:
         specifier: 5.5.0
         version: 5.5.0
@@ -635,9 +635,9 @@ packages:
   character-entities@2.0.2:
     resolution: {integrity: sha512-shx7oQ0Awen/BRIdkjkvz54PnEEI/EjwXDSIZp86/KKdbafHh1Df/RYGBhn4hbe2+uKC9FnT5UCEdyPz3ai9hQ==}
 
-  chat-adapter-mattermost@file:../mattermost-lab/chat-adapter-mattermost-0.0.4.tgz:
-    resolution: {integrity: sha512-xhmx4IfCIj/1P2bYR1bO2hkGSiaKz+RoaFqX7ZOxHPA4FyuRZrxoWqMQNg5nNwWtj7iThxHqhCLKtjbrIuC85g==, tarball: file:../mattermost-lab/chat-adapter-mattermost-0.0.4.tgz}
-    version: 0.0.4
+  chat-adapter-mattermost@file:../mattermost-lab/chat-adapter-mattermost-0.0.5.tgz:
+    resolution: {integrity: sha512-gPnwiHPlTvx/dMDVJRvBcIwDhbuDjEImMXqETk/ljBiFlpSsBp2ymimn4yWqqEF7stk7JTlV78+eie38dzLd1Q==, tarball: file:../mattermost-lab/chat-adapter-mattermost-0.0.5.tgz}
+    version: 0.0.5
     engines: {node: '>=20'}
 
   chat@4.29.0:
@@ -2041,7 +2041,7 @@ snapshots:
 
   character-entities@2.0.2: {}
 
-  chat-adapter-mattermost@file:../mattermost-lab/chat-adapter-mattermost-0.0.4.tgz:
+  chat-adapter-mattermost@file:../mattermost-lab/chat-adapter-mattermost-0.0.5.tgz:
     dependencies:
       chat: 4.29.0
       ws: 8.21.1

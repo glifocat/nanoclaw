@@ -531,6 +531,46 @@ describe('pseudo-tool markup suppression (PF3)', () => {
     expect(out).toHaveLength(1);
     expect(JSON.parse(out[0].content).text).toBe(mixed);
   });
+
+  it('nudges when tool-call markup lands in bare scratchpad outside any envelope', async () => {
+    // The live failure shape (2026-07-29): a prose envelope delivered to one
+    // channel plus a <nanoclaw_send_card ...> emitted as bare text outside
+    // any envelope. sent > 0 keeps the re-wrap nudge quiet and the
+    // envelope-body pseudo-tool check never sees bare text — the card
+    // previously died silently as scratchpad.
+    seedDestination('local-web');
+    const { query, pushes } = makeResultQuery({
+      type: 'result',
+      text:
+        `<message to="local-web">Kicking off the adventure now.</message>\n` +
+        `<nanoclaw_send_card card="{&quot;title&quot;: &quot;The Neon Labyrinth&quot;}">`,
+    });
+
+    await processQuery(query, ERR_ROUTING, ['m1'], 'opencode', undefined, 'prompt', undefined);
+
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0].content).text).toBe('Kicking off the adventure now.');
+    expect(pushes).toHaveLength(1);
+    expect(pushes[0]).toContain('made-up tool-call tag');
+  });
+
+  it('does not nudge on ordinary prose scratchpad around a delivered envelope', async () => {
+    // Bare non-tool text around a delivered envelope stays plain scratchpad:
+    // logged, never delivered, and no corrective push of any kind.
+    seedDestination('local-web');
+    const { query, pushes } = makeResultQuery({
+      type: 'result',
+      text: `Thinking about the next scene...\n<message to="local-web">Here we go.</message>`,
+    });
+
+    await processQuery(query, ERR_ROUTING, ['m1'], 'opencode', undefined, 'prompt', undefined);
+
+    expect(pushes).toHaveLength(0);
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0].content).text).toBe('Here we go.');
+  });
 });
 
 describe('isCorruptionError', () => {
