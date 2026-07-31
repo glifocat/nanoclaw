@@ -39,6 +39,43 @@ function mergeNoProxy(current: string | undefined, additions: string): string {
   return [...parts].join(',');
 }
 
+interface OpenCodeProviderSettings {
+  modelProvider?: unknown;
+  baseUrl?: unknown;
+  smallModel?: unknown;
+  contextLimit?: unknown;
+  outputLimit?: unknown;
+  inputModalities?: unknown;
+}
+
+/** Apply provisioned provider settings over service defaults. Invalid hand-edited values fail closed to unset. */
+export function applyOpenCodeProviderSettings(
+  env: Record<string, string>,
+  settings: OpenCodeProviderSettings | undefined,
+): void {
+  if (!settings) return;
+
+  const setString = (property: keyof OpenCodeProviderSettings, envKey: string) => {
+    if (!(property in settings)) return;
+    const value = settings[property];
+    if (typeof value === 'string' && value.trim()) env[envKey] = value.trim();
+    else delete env[envKey];
+  };
+  const setPositiveInteger = (property: keyof OpenCodeProviderSettings, envKey: string) => {
+    if (!(property in settings)) return;
+    const value = settings[property];
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) env[envKey] = String(value);
+    else delete env[envKey];
+  };
+
+  setString('modelProvider', 'OPENCODE_PROVIDER');
+  setString('baseUrl', 'ANTHROPIC_BASE_URL');
+  setString('smallModel', 'OPENCODE_SMALL_MODEL');
+  setPositiveInteger('contextLimit', 'OPENCODE_MODEL_CONTEXT_LIMIT');
+  setPositiveInteger('outputLimit', 'OPENCODE_MODEL_OUTPUT_LIMIT');
+  setString('inputModalities', 'OPENCODE_MODEL_INPUT_MODALITIES');
+}
+
 registerProviderContainerConfig('opencode', (ctx) => {
   const opencodeDir = path.join(ctx.sessionDir, 'opencode-xdg');
   fs.mkdirSync(opencodeDir, { recursive: true });
@@ -58,6 +95,38 @@ registerProviderContainerConfig('opencode', (ctx) => {
     const value = ctx.hostEnv[key] ?? dotenv[key];
     if (value) env[key] = value;
   }
+
+  // Per-group overrides. The compatibility sidecar supports older Spark
+  // groups; typed container_configs.provider_settings wins for new groups.
+  const readJson = (file: string): Record<string, unknown> | undefined => {
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      return undefined;
+    }
+  };
+  if (ctx.model) env.OPENCODE_MODEL = ctx.model;
+  const GROUP_ENV_ALLOWLIST = [
+    'OPENCODE_PROVIDER',
+    'OPENCODE_MODEL',
+    'OPENCODE_SMALL_MODEL',
+    'ANTHROPIC_BASE_URL',
+    'OPENCODE_MODEL_CONTEXT_LIMIT',
+    'OPENCODE_MODEL_OUTPUT_LIMIT',
+    'OPENCODE_MODEL_INPUT_MODALITIES',
+  ];
+  const groupEnv = readJson(path.join(ctx.groupDir, 'provider-env.json'));
+  for (const [key, value] of Object.entries(groupEnv ?? {})) {
+    if (GROUP_ENV_ALLOWLIST.includes(key) && typeof value === 'string') env[key] = value;
+  }
+
+  const opencodeSettings = ctx.providerSettings.opencode;
+  applyOpenCodeProviderSettings(
+    env,
+    typeof opencodeSettings === 'object' && opencodeSettings !== null
+      ? (opencodeSettings as OpenCodeProviderSettings)
+      : undefined,
+  );
 
   return {
     mounts: [{ hostPath: opencodeDir, containerPath: '/opencode-xdg', readonly: false }],

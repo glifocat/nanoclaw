@@ -20,7 +20,8 @@ import { migration018 } from './018-approvals-approver-user-id.js';
 import { migration019 } from './019-wiring-threads.js';
 import { migration020 as migration020DeliveryMode } from './020-delivery-mode.js';
 import { migration020 as migration020ContainerConfigTimezone } from './020-container-config-timezone.js';
-import { migration021 } from './021-approval-question.js';
+import { migration021 as migration021OpenCodeRegistration } from './021-opencode-registration-provisioning.js';
+import { migration021 as migration021ApprovalQuestion } from './021-approval-question.js';
 import { migration022 } from './022-messaging-group-detached.js';
 
 export interface Migration {
@@ -66,7 +67,8 @@ export const migrations: Migration[] = [
   migration019,
   migration020DeliveryMode,
   migration020ContainerConfigTimezone,
-  migration021,
+  migration021OpenCodeRegistration,
+  migration021ApprovalQuestion,
   migration022,
 ];
 

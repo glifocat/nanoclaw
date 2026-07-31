@@ -260,6 +260,7 @@ export interface ContainerConfig {
   effort?: string;
   deliveryMode?: DeliveryMode;
   timezone?: string;
+  providerSettings?: Record<string, unknown>;
 }
 
 /**
@@ -273,11 +274,7 @@ export function resolveGroupTimezone(agentGroupId: string): string {
   return tz && isValidTimezone(tz) ? tz : TIMEZONE;
 }
 
-/**
- * Defense-in-depth re-validation of the stored MCP server blob (threat: a
- * hand-edited DB value bypassing the three validated write paths). Invalid
- * entries are dropped + logged instead of shipped to the container.
- */
+/** Defense-in-depth validation of the stored MCP server blob. */
 export function sanitizeStoredMcpServers(raw: unknown, groupName: string): Record<string, McpServerConfig> {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     log.warn('Stored mcp_servers is not an object; ignoring all entries', { group: groupName });
@@ -301,10 +298,6 @@ export function sanitizeStoredMcpServers(raw: unknown, groupName: string): Recor
         server.pluginRoot = pluginRoot;
       }
       if (server.type !== 'http' && server.cwd && !server.pluginRoot) {
-        // cwd resolves against a plugin root; without provenance nothing can
-        // resolve it. This strip is the ONLY layer (the runtime passes
-        // provenance-less servers through untouched), and the breadcrumb
-        // lands in host logs instead of nowhere.
         delete server.cwd;
         log.warn('Stripping cwd from stored MCP server without plugin provenance', { group: groupName, server: name });
       }
@@ -343,6 +336,7 @@ export function configFromDb(row: ContainerConfigRow, group: AgentGroup): Contai
     // than reaching the runner: an unreadable mode must never widen delivery.
     deliveryMode: isDeliveryMode(row.delivery_mode) ? row.delivery_mode : undefined,
     timezone: row.timezone && isValidTimezone(row.timezone) ? row.timezone : undefined,
+    providerSettings: JSON.parse(row.provider_settings ?? '{}') as Record<string, unknown>,
   };
 }
 
