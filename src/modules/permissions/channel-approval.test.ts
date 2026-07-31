@@ -36,6 +36,29 @@ const telegramDefaults: ChannelDefaults = {
 };
 registerChannelAdapter('telegram', { factory: () => null, defaults: telegramDefaults });
 
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execFile: vi.fn(
+      (
+        _file: string,
+        args: string[],
+        _options: Record<string, unknown>,
+        callback: (error: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        void globalThis
+          .fetch(args.at(-1) ?? '')
+          .then(async (response) => callback(null, await response.text(), ''))
+          .catch((error: unknown) =>
+            callback(error instanceof Error ? error : new Error('mock OneCLI request failed'), '', ''),
+          );
+        return {};
+      },
+    ),
+  };
+});
+
 // Mock container runner — prevent actual docker spawn.
 vi.mock('../../container-runner.js', () => ({
   wakeContainer: vi.fn().mockResolvedValue(undefined),
