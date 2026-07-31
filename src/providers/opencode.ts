@@ -28,6 +28,43 @@ function mergeNoProxy(current: string | undefined, additions: string): string {
   return [...parts].join(',');
 }
 
+interface OpenCodeProviderSettings {
+  modelProvider?: unknown;
+  baseUrl?: unknown;
+  smallModel?: unknown;
+  contextLimit?: unknown;
+  outputLimit?: unknown;
+  inputModalities?: unknown;
+}
+
+/** Apply provisioned provider settings over service defaults. Invalid hand-edited values fail closed to unset. */
+export function applyOpenCodeProviderSettings(
+  env: Record<string, string>,
+  settings: OpenCodeProviderSettings | undefined,
+): void {
+  if (!settings) return;
+
+  const setString = (property: keyof OpenCodeProviderSettings, envKey: string) => {
+    if (!(property in settings)) return;
+    const value = settings[property];
+    if (typeof value === 'string' && value.trim()) env[envKey] = value.trim();
+    else delete env[envKey];
+  };
+  const setPositiveInteger = (property: keyof OpenCodeProviderSettings, envKey: string) => {
+    if (!(property in settings)) return;
+    const value = settings[property];
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) env[envKey] = String(value);
+    else delete env[envKey];
+  };
+
+  setString('modelProvider', 'OPENCODE_PROVIDER');
+  setString('baseUrl', 'ANTHROPIC_BASE_URL');
+  setString('smallModel', 'OPENCODE_SMALL_MODEL');
+  setPositiveInteger('contextLimit', 'OPENCODE_MODEL_CONTEXT_LIMIT');
+  setPositiveInteger('outputLimit', 'OPENCODE_MODEL_OUTPUT_LIMIT');
+  setString('inputModalities', 'OPENCODE_MODEL_INPUT_MODALITIES');
+}
+
 registerProviderContainerConfig('opencode', (ctx) => {
   const opencodeDir = path.join(ctx.sessionDir, 'opencode-xdg');
   fs.mkdirSync(opencodeDir, { recursive: true });
@@ -50,10 +87,9 @@ registerProviderContainerConfig('opencode', (ctx) => {
     if (value) env[key] = value;
   }
 
-  // Per-group overrides (G1, 2026-07-25). Precedence: provider-env.json >
-  // container.json `model` > service hostEnv. Both files live in the group dir;
-  // absence or parse failure falls back to the service-wide values so a broken
-  // file can never stop a spawn.
+  // Per-group overrides (G1, 2026-07-25). Keep the sidecar as a compatibility
+  // fallback for existing Spark groups, but new provisioning snapshots into
+  // container_configs.provider_settings and that typed DB surface wins.
   const readJson = (file: string): Record<string, unknown> | undefined => {
     try {
       return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -61,11 +97,9 @@ registerProviderContainerConfig('opencode', (ctx) => {
       return undefined;
     }
   };
-  const groupConfig = readJson(path.join(ctx.groupDir, 'container.json'));
-  if (typeof groupConfig?.model === 'string' && groupConfig.model) {
-    env.OPENCODE_MODEL = groupConfig.model;
-  }
+  if (ctx.model) env.OPENCODE_MODEL = ctx.model;
   const GROUP_ENV_ALLOWLIST = [
+    'OPENCODE_PROVIDER',
     'OPENCODE_MODEL',
     'OPENCODE_SMALL_MODEL',
     'ANTHROPIC_BASE_URL',
@@ -79,6 +113,14 @@ registerProviderContainerConfig('opencode', (ctx) => {
       env[key] = value;
     }
   }
+
+  const opencodeSettings = ctx.providerSettings.opencode;
+  applyOpenCodeProviderSettings(
+    env,
+    typeof opencodeSettings === 'object' && opencodeSettings !== null
+      ? (opencodeSettings as OpenCodeProviderSettings)
+      : undefined,
+  );
 
   return {
     mounts: [{ hostPath: opencodeDir, containerPath: '/opencode-xdg', readonly: false }],

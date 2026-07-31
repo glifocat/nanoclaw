@@ -320,6 +320,8 @@ CREATE TABLE container_configs (
   packages_npm           TEXT NOT NULL DEFAULT '[]',
   additional_mounts      TEXT NOT NULL DEFAULT '[]',
   cli_scope              TEXT NOT NULL DEFAULT 'group',   -- disabled | group | global
+  delivery_mode          TEXT,                            -- envelope | tools-only
+  provider_settings      TEXT NOT NULL DEFAULT '{}',      -- provider-keyed JSON
   updated_at             TEXT NOT NULL
 );
 ```
@@ -366,11 +368,15 @@ CREATE TABLE pending_channel_approvals (
   approver_user_id   TEXT NOT NULL,
   created_at         TEXT NOT NULL,
   title              TEXT NOT NULL DEFAULT '',       -- added by migration 013
-  options_json       TEXT NOT NULL DEFAULT '[]'      -- added by migration 013
+  options_json       TEXT NOT NULL DEFAULT '[]',     -- added by migration 013
+  provisioning_step TEXT NOT NULL DEFAULT 'idle',    -- added by migration 021
+  new_agent_name     TEXT,
+  selected_provider_id TEXT,
+  selected_model_id TEXT
 );
 ```
 
-Approve creates the `messaging_group_agents` wiring and replays the triggering event; deny sets `messaging_groups.denied_at` so future messages on that channel drop without re-prompting. Either way, this row is deleted.
+Connecting an existing group creates the `messaging_group_agents` wiring and replays the triggering event. Creating a new group first advances through the persisted OpenCode name/provider/live-model-discovery/confirmation steps; only confirmation provisions the group and wiring. Deny sets `messaging_groups.denied_at` so future messages on that channel drop without re-prompting. Completion, cancellation, or denial deletes this row.
 
 - Access layer: `src/modules/permissions/db/pending-channel-approvals.ts`
 - **Readers/writers:** `src/modules/permissions/channel-approval.ts`, `src/modules/permissions/index.ts`, `src/router.ts`, `src/db/sessions.ts` (`getAskQuestionRender`), `src/cli/resources/groups.ts`
@@ -391,6 +397,33 @@ CREATE TABLE agent_message_policies (
 
 - Access layer: `src/modules/agent-to-agent/db/agent-message-policies.ts`
 - **Readers/writers:** `src/cli/resources/policies.ts`; approved messages create a row in `pending_approvals` (see §1.11) via the a2a send path.
+
+### 1.19 `opencode_model_providers`
+
+Operator-defined, credential-free OpenCode provider connections. Channel registration discovers models from the configured source and copies the selected settings into the new group's `container_configs.provider_settings` JSON.
+
+```sql
+CREATE TABLE opencode_model_providers (
+  id               TEXT PRIMARY KEY,
+  name             TEXT NOT NULL UNIQUE,
+  provider_id      TEXT NOT NULL,
+  discovery_type   TEXT NOT NULL DEFAULT 'models-dev',
+  base_url         TEXT,
+  models_url       TEXT,
+  context_limit    INTEGER,
+  output_limit     INTEGER,
+  input_modalities TEXT NOT NULL DEFAULT '',
+  delivery_mode    TEXT,
+  instructions     TEXT,
+  enabled          INTEGER NOT NULL DEFAULT 1,
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL
+);
+```
+
+- Access layer: `src/db/opencode-model-providers.ts`
+- **Writers:** `ncl opencode-model-providers create/update/delete`
+- **Reader:** `src/modules/permissions/index.ts`
 
 ---
 
@@ -425,6 +458,9 @@ Several early migrations were later renamed/retired and replaced by "module" fil
 | 16 | `messaging-group-instance` | `016-messaging-group-instance.ts` | `messaging_groups` gets an `instance` column (adapter-instance dimension); table recreate (`disableForeignKeys: true`) backfills `instance = channel_type` on every existing row and relaxes the `UNIQUE` to `(channel_type, platform_id, instance)` |
 | 17 | `agent-message-policies` | `017-agent-message-policies.ts` | `agent_message_policies` (see §1.18) |
 | 18 | `approvals-approver-user-id` | `018-approvals-approver-user-id.ts` | `pending_approvals.approver_user_id` — names a single required approver for a2a message-gate policies |
+| 19 | `wiring-threads` | `019-wiring-threads.ts` | Per-wiring thread behavior override |
+| 20 | `delivery-mode` | `020-delivery-mode.ts` | `container_configs.delivery_mode` |
+| 21 | `opencode-registration-provisioning` | `021-opencode-registration-provisioning.ts` | OpenCode provider connections, live model selection, provider settings snapshots, and restart-safe registration state |
 
 Numbers 5 and 6 are intentionally absent — migrations were renumbered during early development.
 

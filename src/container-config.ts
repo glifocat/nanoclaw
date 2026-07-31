@@ -53,6 +53,7 @@ export interface ContainerConfig {
   model?: string;
   effort?: string;
   deliveryMode?: DeliveryMode;
+  providerSettings?: Record<string, unknown>;
 }
 
 /** Build a `ContainerConfig` from a DB row + agent group identity. */
@@ -76,6 +77,7 @@ export function configFromDb(row: ContainerConfigRow, group: AgentGroup): Contai
     // Anything the column doesn't recognize resolves to the default rather
     // than reaching the runner: an unreadable mode must never widen delivery.
     deliveryMode: isDeliveryMode(row.delivery_mode) ? row.delivery_mode : undefined,
+    providerSettings: JSON.parse(row.provider_settings ?? '{}') as Record<string, unknown>,
   };
 }
 
