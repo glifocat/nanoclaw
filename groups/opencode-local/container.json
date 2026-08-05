@@ -1,5 +1,14 @@
 {
-  "mcpServers": {},
+  "mcpServers": {
+    "tavily": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "tavily-mcp@0.2.21"
+      ],
+      "env": {}
+    }
+  },
   "packages": {
     "apt": [],
     "npm": [
@@ -16,5 +25,7 @@
   "groupName": "OpenCode Local",
   "assistantName": "OpenCode Local",
   "agentGroupId": "ag-6e9d6f1b-77e1-4cbf-b86c-e9fd062a2c19",
-  "model": "openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic"
+  "model": "openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic",
+  "deliveryMode": "tools-only",
+  "providerSettings": {}
 }
