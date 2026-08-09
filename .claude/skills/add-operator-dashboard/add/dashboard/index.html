@@ -471,6 +471,22 @@ details.raw summary:hover { color: var(--ink); }
 .chatlog { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 16px 14px; display: flex; flex-direction: column; background: var(--bg); }
 .msg { display: flex; flex-direction: column; align-items: flex-start; margin: 3px 0; }
 .msg .bub { max-width: min(78%, 580px); padding: 8px 13px; border-radius: 16px; border-bottom-left-radius: 6px; font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface2); }
+.msg .bub strong { font-weight: 700; }
+.msg .bub em { font-style: italic; }
+.msg .bub del { opacity: .7; }
+.msg .bub a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.msg .bub code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; background: color-mix(in srgb, var(--line) 55%, transparent); padding: 1px 5px; border-radius: 5px; }
+.msg .bub code.cb { display: block; padding: 8px 10px; margin: 5px 0; white-space: pre-wrap; overflow-x: auto; line-height: 1.4; }
+.msg.op .bub code { background: rgba(0, 0, 0, .16); }
+.msg .bub .cbwrap { position: relative; display: block; }
+.msg .bub .cbcopy { position: absolute; top: 6px; right: 6px; font: 600 10.5px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; color: var(--muted); background: color-mix(in srgb, var(--surface) 85%, transparent); border: 1px solid var(--line); border-radius: 5px; padding: 3px 7px; cursor: pointer; opacity: 0; transition: opacity .12s; }
+.msg .bub .cbwrap:hover .cbcopy, .msg .bub .cbcopy:focus-visible { opacity: 1; }
+.msg .bub .cbcopy.ok { color: #3bb273; border-color: #3bb273; opacity: 1; }
+.msg .bub mark.hl { background: color-mix(in srgb, var(--coral) 45%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.chatsearch { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.chatsearch > .ic { color: var(--muted); flex: none; }
+.chatsearch input { flex: 1; min-width: 0; min-height: 34px; padding: 5px 8px; font-size: 13px; }
+.chatsearch .cnt { font-size: 11px; color: var(--muted); white-space: nowrap; flex: none; }
 .msg .mt { font-size: 10.5px; color: var(--faint); margin: 3px 6px 0; }
 .msg .ms { font-size: 10.5px; font-weight: 700; color: var(--coral); margin: 0 6px 2px; }
 .msg .mis { font-size: 10.5px; color: var(--warn); margin: 2px 6px 0; }
@@ -611,6 +627,27 @@ const S = {
 };
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+// Render the WhatsApp-style markup the agents actually emit (*bold*, _italic_,
+// ~strike~, `code`, ```blocks```, [text](url), bare links). Escapes first, so the
+// output is safe to inject as innerHTML. NOT full Markdown — deliberately the
+// single-asterisk subset our agents use (marked/CommonMark would read *x* as italic).
+const mdBody = (s) => {
+  let t = esc(s);
+  const codes = [];
+  const stash = (html) => { codes.push(html); return `\uE000${codes.length - 1}\uE000`; };
+  // Pull code spans out first so nothing inside them gets further formatting.
+  t = t.replace(/```+\s*([\s\S]*?)```+/g, (_, c) => stash(`<span class="cbwrap"><button class="cbcopy" type="button" aria-label="Copy code">Copy</button><code class="cb">${c.replace(/^\n/, "").replace(/\n$/, "")}</code></span>`));
+  t = t.replace(/`([^`\n]+?)`/g, (_, c) => stash(`<code>${c}</code>`));
+  // Links: [text](url) then bare http(s) urls not already inside an attribute.
+  t = t.replace(/\[([^\]\n]+?)\]\((https?:\/\/[^\s)]+)\)/g, (_, tx, u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${tx}</a>`);
+  t = t.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (_, pre, u) => `${pre}<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
+  // Inline emphasis — WhatsApp style (single asterisk bold, underscore italic, tilde strike).
+  t = t.replace(/\*([^*\n]+?)\*/g, "<strong>$1</strong>");
+  t = t.replace(/(^|[^\w])_([^_\n]+?)_(?![\w])/g, "$1<em>$2</em>");
+  t = t.replace(/~([^~\n]+?)~/g, "<del>$1</del>");
+  // Restore the untouched code spans.
+  return t.replace(/\uE000(\d+)\uE000/g, (_, i) => codes[+i]);
+};
 const ico = (name, cls) => `<svg class="ic ${cls || ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 
 /* =============================== api ================================= */
@@ -746,6 +783,7 @@ const REG = {
       { key: "name", label: "Name", help: "Display name (not necessarily unique). With a template, overrides the template's default name." },
       { key: "folder", label: "Folder", help: "Directory under groups/ on the host. Unique, immutable. Required unless a template is given." },
       { key: "template", label: "Template (optional)", help: "Template ref under templates/ to stamp from (persona, MCP servers, skills, paused recurring tasks). Makes Folder optional." },
+      { key: "timezone", label: "Timezone (optional)", help: 'IANA id like "Europe/Lisbon" — grounds this group\'s cron schedules and container TZ. Blank = install default. Ignored when the folder already exists.' },
     ]},
     edit: {
       cmd: "groups update",
@@ -782,7 +820,7 @@ const REG = {
       { key: "name", label: "Display name" },
       { key: "instance", label: "Adapter instance", help: "Defaults to channel_type when omitted." },
       { key: "is-group", label: "Multi-user group chat", type: "select", options: [{v:"0",l:"0 — direct message"},{v:"1",l:"1 — group chat"}] },
-      { key: "unknown-sender-policy", label: "Unknown sender policy", type: "select", options: ["strict","request_approval","public"].map(v=>({v,l:v})) },
+      { key: "unknown-sender-policy", label: "Unknown sender policy", type: "select", options: [{v:"",l:"— adapter default —"},...["strict","request_approval","public"].map(v=>({v,l:v}))], help: "Adapter default resolves from the channel's declared defaults (DM vs group aware)." },
     ]},
     edit: {
       cmd: "messaging-groups update",
@@ -822,8 +860,8 @@ const REG = {
     create: { title: "New wiring", btn: "Create wiring", fields: [
       { key: "messaging-group-id", label: "Messaging group", req: 1, type: "select", optionsFn: mgOpts },
       { key: "agent-group-id", label: "Agent group", req: 1, type: "select", optionsFn: agOpts },
-      { key: "engage-mode", label: "Engage mode", type: "select", options: ENGAGE.map(v=>({v,l:v})) },
-      { key: "engage-pattern", label: "Engage pattern (regex)", help: 'Required for engage-mode=pattern. Use "." for always-on.' },
+      { key: "engage-mode", label: "Engage mode", type: "select", options: [{v:"",l:"— adapter default —"},...ENGAGE.map(v=>({v,l:v}))], help: "Adapter default resolves from the channel's declared defaults (DM vs group aware); undeclared channels fall back to mention." },
+      { key: "engage-pattern", label: "Engage pattern (regex)", help: 'Required for engage-mode=pattern. Use "." for always-on. Leave blank with adapter-default mode — the declaration supplies it.' },
       { key: "sender-scope", label: "Sender scope", type: "select", options: ["all","known"].map(v=>({v,l:v})) },
       { key: "ignored-message-policy", label: "Ignored message policy", type: "select", options: ["drop","accumulate"].map(v=>({v,l:v})) },
       { key: "session-mode", label: "Session mode", type: "select", options: ["shared","per-thread","agent-shared"].map(v=>({v,l:v})) },
@@ -1429,7 +1467,7 @@ async function loadGroupConfig(g) {
   if (!slot) return;
   if (!res.ok) { slot.innerHTML = `<span class="chip err">${esc(res.error?.message || "failed")}</span>`; return; }
   const c = res.data;
-  S.cfgCtx = { id: g.id, g, mcp: Object.keys(c.mcp_servers || {}), apt: c.packages_apt || [], npm: c.packages_npm || [] };
+  S.cfgCtx = { id: g.id, g, c, mcp: Object.keys(c.mcp_servers || {}), apt: c.packages_apt || [], npm: c.packages_npm || [] };
   const scalarField = (key, label, value, opts, suggest) => `
     <div class="ffield"><label for="cfg-${key}">${label}</label>
       ${opts ? `<select id="cfg-${key}">${opts.map(o => `<option value="${esc(o)}" ${String(value ?? "") === o ? "selected" : ""}>${esc(o || "(default)")}</option>`).join("")}</select>`
@@ -1445,6 +1483,7 @@ async function loadGroupConfig(g) {
     ${scalarField("assistant-name", "Assistant name", c.assistant_name)}
     ${scalarField("max-messages-per-prompt", "Max messages per prompt", c.max_messages_per_prompt)}
     ${scalarField("cli-scope", "CLI scope", c.cli_scope, ["disabled", "group", "global"])}
+    ${scalarField("timezone", "Timezone (IANA)", c.timezone)}
     <div class="fbtns"><button class="btn pri" onclick="saveGroupConfig('${g.id}')">Save changes</button></div>
 
     <div class="dsec">MCP servers</div>
@@ -1488,9 +1527,20 @@ function reopenCfg(id) {
 }
 async function saveGroupConfig(id) {
   const args = { id };
-  for (const k of ["provider", "model", "effort", "image-tag", "assistant-name", "max-messages-per-prompt", "cli-scope"]) {
+  // Blank = "leave unchanged" (the server omits empty args), so a field blanked
+  // by the operator would silently NOT clear — refuse with an honest message
+  // instead of toasting a false success.
+  const orig = (S.cfgCtx && S.cfgCtx.c) || {};
+  const blanked = [];
+  for (const k of ["provider", "model", "effort", "image-tag", "assistant-name", "max-messages-per-prompt", "cli-scope", "timezone"]) {
     const el = $("#cfg-" + CSS.escape(k));
-    if (el && el.value !== "") args[k] = el.value;
+    if (!el) continue;
+    if (el.value !== "") args[k] = el.value;
+    else { const o = orig[k.replace(/-/g, "_")]; if (o !== undefined && o !== null && String(o) !== "") blanked.push(k); }
+  }
+  if (blanked.length) {
+    toast(false, "Blanked fields are not cleared", `Blank means "leave unchanged" here (${blanked.join(", ")}). Restore the value, or clear it from the CLI (e.g. ncl groups config update --${blanked[0]} "").`);
+    return;
   }
   const res = await ncl("groups", "config update", args);
   toast(res.ok, res.ok ? "Config saved — restart to apply" : "Config update failed", res.ok ? "" : res.error?.message, res.cmd);
@@ -1718,6 +1768,15 @@ function collectFields(fields, cleared, pfx) {
     const el = document.getElementById(pfx + f.key);
     let v = f.type === "checkbox" ? el.checked : el.value.trim();
     if (f.req && (v === "" || v === false || v === undefined)) { bad(f, "Required."); continue; }
+    // A prefilled text field blanked by the operator reads as a clear attempt —
+    // but blank args are omitted end-to-end ("leave unchanged"), so submitting
+    // would toast success while changing nothing. Refuse honestly. Selects with
+    // a deliberate empty option and clearable fields (sentinel) are exempt.
+    if (v === "" && !f.clearable && f.type !== "select" && f.type !== "checkbox"
+        && f.value !== undefined && f.value !== null && String(f.value) !== "") {
+      bad(f, 'Blank means "leave unchanged" — this field can’t be cleared from the dashboard. Restore the value or clear it via the ncl CLI.');
+      continue;
+    }
     if (f.expect !== undefined) {
       // Normalize both sides: the input arrives trimmed, so trim the expected
       // value too — otherwise a name with leading/trailing whitespace can never
@@ -1814,9 +1873,36 @@ document.addEventListener("keydown", e => {
   if ($("#moresheet").classList.contains("on")) { closeMore(); return; }
   closeDrawer();
 });
+// navigator.clipboard exists only in secure contexts — this dashboard is served
+// over plain HTTP on a tailnet IP, so fall back to the execCommand path there.
+function copyText(text) {
+  if (navigator.clipboard) return navigator.clipboard.writeText(text).then(() => true, () => copyTextFallback(text));
+  return Promise.resolve(copyTextFallback(text));
+}
+function copyTextFallback(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.setAttribute("readonly", "");
+  ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { ok = false; }
+  ta.remove();
+  return ok;
+}
 document.addEventListener("click", e => {
   const td = e.target.closest ? e.target.closest("td.copyable") : null;
-  if (td && navigator.clipboard) navigator.clipboard.writeText(td.dataset.copy).then(() => toast(true, "Copied to clipboard"));
+  if (td) copyText(td.dataset.copy).then(ok => toast(ok, ok ? "Copied to clipboard" : "Copy failed", ok ? "" : "Select the text and copy manually."));
+  const cb = e.target.closest ? e.target.closest(".cbcopy") : null;
+  if (cb) {
+    const code = cb.parentElement && cb.parentElement.querySelector("code.cb");
+    const text = code ? code.textContent : "";
+    if (text) copyText(text).then(ok => {
+      if (!ok) { toast(false, "Copy failed", "Select the text and copy manually."); return; }
+      cb.textContent = "Copied"; cb.classList.add("ok");
+      setTimeout(() => { cb.textContent = "Copy"; cb.classList.remove("ok"); }, 1400);
+    });
+  }
 });
 
 /* ============================== overview ============================= */
@@ -2066,9 +2152,16 @@ function renderChatConvo() {
       <div class="chathead">
         <button class="btn icon" onclick="closeChat()" aria-label="Back to agent list">${ico("back")}</button>
         <div class="who"><b>${esc(g.name)}</b><span class="sub" id="chatsub"></span></div>
+        <button class="btn icon" id="chatsearchbtn" type="button" onclick="toggleChatSearch()" aria-label="Search conversation" title="Search conversation">${ico("search")}</button>
         <label class="sr" for="chatline">Conversation line</label>
         <select id="chatline" onchange="setChatLine(this.value)"><option value="webui">Private line (webui)</option></select>
         <button class="btn icon danger" id="unprovbtn" hidden onclick="unprovisionChat()" aria-label="Remove private line" title="Remove private line">${ico("unplug")}</button>
+      </div>
+      <div class="chatsearch" id="chatsearch" hidden>
+        ${ico("search")}
+        <input id="chatsearchinput" type="search" placeholder="Search this conversation…" oninput="setChatQuery(this.value)" onkeydown="chatSearchKey(event)" autocomplete="off">
+        <span class="cnt" id="chatsearchcnt"></span>
+        <button class="btn icon" type="button" onclick="closeChatSearch()" aria-label="Close search">${ico("x")}</button>
       </div>
       <div class="chatbanner" id="chatbanner"></div>
       <div class="chatlog" id="chatlog"></div>
@@ -2079,8 +2172,54 @@ function renderChatConvo() {
       </form>
     </div>`;
   $("#composer").addEventListener("submit", chatSubmit);
+  if (S.chat && S.chat.query) {
+    const bar = $("#chatsearch"); if (bar) bar.hidden = false;
+    const i = $("#chatsearchinput"); if (i) i.value = S.chat.query;
+  }
   renderChatLog();
   updateChatBanner();
+}
+
+function toggleChatSearch() {
+  const bar = $("#chatsearch"); if (!bar) return;
+  if (bar.hidden) { bar.hidden = false; const i = $("#chatsearchinput"); if (i) i.focus(); }
+  else closeChatSearch();
+}
+function closeChatSearch() {
+  const bar = $("#chatsearch"); if (bar) bar.hidden = true;
+  const i = $("#chatsearchinput"); if (i) i.value = "";
+  setChatQuery("");
+}
+function setChatQuery(q) {
+  const c = S.chat; if (!c) return;
+  c.query = q; c.sig = ""; renderChatLog();
+}
+function chatSearchKey(e) {
+  if (e.key === "Escape") { e.preventDefault(); closeChatSearch(); }
+}
+function highlightChat(root, needle) {
+  root.querySelectorAll(".msg .bub").forEach(bub => {
+    const walker = document.createTreeWalker(bub, NodeFilter.SHOW_TEXT, null);
+    const nodes = []; let n;
+    while (n = walker.nextNode()) nodes.push(n);
+    nodes.forEach(node => {
+      if (node.parentElement && node.parentElement.closest(".cbcopy")) return;
+      const text = node.nodeValue, lower = text.toLowerCase();
+      if (!lower.includes(needle)) return;
+      const frag = document.createDocumentFragment();
+      let i = 0, idx;
+      while ((idx = lower.indexOf(needle, i)) !== -1) {
+        if (idx > i) frag.appendChild(document.createTextNode(text.slice(i, idx)));
+        const mark = document.createElement("mark");
+        mark.className = "hl";
+        mark.textContent = text.slice(idx, idx + needle.length);
+        frag.appendChild(mark);
+        i = idx + needle.length;
+      }
+      if (i < text.length) frag.appendChild(document.createTextNode(text.slice(i)));
+      node.parentNode.replaceChild(frag, node);
+    });
+  });
 }
 
 function setChatLine(v) {
@@ -2207,31 +2346,40 @@ function renderChatLog() {
   msgs.sort((a, b) => String(a.time).localeCompare(String(b.time)));
   const last = msgs[msgs.length - 1];
   const thinking = !!last && last.role !== "agent" && Date.now() - new Date(last.time).getTime() < 10 * 60e3;
-  const sig = `${c.mode}:${msgs.length}:${last ? last.time + last.role + (last.pending ? "p" : "") : ""}:${thinking}`;
+  const q = (c.query || "").trim().toLowerCase();
+  const sig = `${c.mode}:${msgs.length}:${last ? last.time + last.role + (last.pending ? "p" : "") : ""}:${thinking}:${q}`;
   if (c.sig === sig) return;
   c.sig = sig;
 
   const nearBottom = !log.childElementCount || log.scrollHeight - log.scrollTop - log.clientHeight < 90;
-  let html = "", prevDay = "";
+  let html = "", prevDay = "", matches = 0;
   if (!msgs.length) {
     html = `<div class="chatsetup"><div class="h">No messages yet — say hi!${c.mode === "webui" ? " The first reply can take a minute or two while the container wakes up." : ""}</div></div>`;
   }
   for (const m of msgs) {
+    if (q && !String(m.text ?? "").toLowerCase().includes(q)) continue;
+    if (q) matches++;
     const d = new Date(m.time);
     const day = isNaN(d) ? "" : d.toDateString();
-    if (day && day !== prevDay) { prevDay = day; html += `<div class="daysep">${esc(fmtDay(d))}</div>`; }
+    if (!q && day && day !== prevDay) { prevDay = day; html += `<div class="daysep">${esc(fmtDay(d))}</div>`; }
     const cls = m.role === "operator" ? "op" : m.role === "agent" ? "ag" : "us";
     html += `<div class="msg ${cls}${m.pending ? " pending" : ""}">` +
       (m.role === "user" && m.sender ? `<span class="ms">${esc(m.sender)}</span>` : "") +
-      `<div class="bub">${esc(m.text)}</div>` +
+      `<div class="bub">${mdBody(m.text)}</div>` +
       (m.sentTo ? `<span class="mis">↪ delivered to ${esc(m.sentTo)}</span>` : "") +
       `<span class="mt">${m.pending ? "sending…" : esc(fmtClock(d))}</span></div>`;
   }
-  if (thinking) {
+  if (q && !matches && msgs.length) {
+    html = `<div class="chatsetup"><div class="h">No messages match “${esc(c.query.trim())}”.</div></div>`;
+  }
+  if (thinking && !q) {
     html += `<div class="msg ag typing"><div class="bub" role="status" aria-label="${esc(g.name)} is thinking"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div><span class="mt">${esc(g.name)} is thinking…</span></div>`;
   }
   log.innerHTML = html;
-  if (nearBottom) log.scrollTop = log.scrollHeight;
+  if (q) highlightChat(log, q);
+  const cnt = $("#chatsearchcnt");
+  if (cnt) cnt.textContent = q ? `${matches} match${matches === 1 ? "" : "es"}` : "";
+  if (nearBottom && !q) log.scrollTop = log.scrollHeight;
 }
 
 async function provisionChat() {
