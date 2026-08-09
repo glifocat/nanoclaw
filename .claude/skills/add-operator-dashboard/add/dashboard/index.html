@@ -442,6 +442,57 @@ details.raw summary:hover { color: var(--ink); }
 .thit:hover + .tedge, .thit:focus + .tedge { stroke-width: 3; opacity: 1; }
 .colhead { fill: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-family: var(--font); font-weight: 700; }
 .topo-tools { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.topo-tools input[type="search"] { flex: 1 1 180px; max-width: 320px; min-width: 140px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; }
+.topo-focusbar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--acc) 7%, var(--surface)); font-size: 13px; flex-wrap: wrap; }
+.topo-focusbar .ic { width: 16px; height: 16px; }
+#topo .tnode.dim, #topo .tedge-g.dim { opacity: .12; }
+#topo .tedge-g.dim { pointer-events: none; }
+#topo .tnode.hl rect:first-of-type { stroke: var(--acc); stroke-width: 2; }
+#topo .tnode.orphan rect:first-of-type { stroke-dasharray: 5 3; stroke: var(--warn); }
+#topo .tnode { transition: opacity .15s; }
+#topo .tedge-g { transition: opacity .15s; }
+#topo .tlabel rect { fill: var(--surface); stroke: var(--line); }
+#topo .tlabel text { font-size: 11px; fill: var(--text); font-family: ui-monospace, monospace; }
+#topo .legend .orph { border: 1.5px dashed var(--warn); background: transparent !important; height: 12px; width: 16px; border-radius: 5px; }
+
+/* ================= NanoClaw 101 ================= */
+.n101 { display: flex; flex-direction: column; gap: 18px; }
+.n101 .sect { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; }
+.n101 h3 { margin: 0 0 4px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.n101 h3 .ic { width: 18px; height: 18px; color: var(--acc); }
+.n101 .lead { color: var(--muted); font-size: 13px; margin: 0 0 14px; line-height: 1.45; }
+.n101 .livechips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.n101 .livechips button { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
+.n101 .livechips button b { color: var(--acc); }
+.n101 .flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+.n101 .fstep { flex: 1 1 128px; min-width: 126px; max-width: 190px; border: 1px solid var(--line); border-left: 4px solid var(--fc, var(--acc)); border-radius: 12px; padding: 10px 12px; background: var(--bg); }
+.n101 .fstep .n { font-size: 10.5px; font-weight: 800; color: var(--fc, var(--acc)); letter-spacing: .06em; }
+.n101 .fstep b { display: block; font-size: 13.5px; margin: 2px 0 3px; }
+.n101 .fstep span { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.n101 .farrow { align-self: center; color: var(--muted); font-size: 15px; padding: 0 1px; }
+.n101 .terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 10px; }
+.n101 .term { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--bg); }
+.n101 .term .thead { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; margin-bottom: 4px; }
+.n101 .term .thead .ic { width: 16px; height: 16px; color: var(--acc); }
+.n101 .term p { margin: 0 0 6px; font-size: 12.5px; line-height: 1.45; }
+.n101 .term .ex { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--muted); display: block; margin-bottom: 6px; overflow-wrap: anywhere; }
+.n101 .term a { font-size: 12px; }
+.n101 .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); gap: 10px; }
+.n101 .mode { border: 1px solid var(--line); border-top: 3px solid var(--mc, var(--acc)); border-radius: 12px; padding: 12px; background: var(--bg); }
+.n101 .mode b { font-size: 13px; }
+.n101 .mode p { margin: 3px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.n101 .mchat { margin-top: 9px; display: flex; flex-direction: column; gap: 4px; }
+.n101 .bub2 { font-size: 11.5px; padding: 4px 9px; border-radius: 9px; background: var(--surface); border: 1px solid var(--line); align-self: flex-start; max-width: 100%; }
+.n101 .bub2.wake { border-color: var(--mc, var(--acc)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--mc, var(--acc)) 45%, transparent); }
+.n101 .bub2 .r { float: right; margin-left: 8px; font-size: 10px; color: var(--muted); }
+.n101 .mailflow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px 14px; align-items: center; max-width: 640px; margin: 0 auto; }
+.n101 .mbox { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; background: var(--bg); text-align: center; font-size: 12px; color: var(--muted); }
+.n101 .mbox b { display: block; font-size: 13px; color: var(--text); }
+.n101 .marr { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--muted); text-align: center; white-space: nowrap; }
+.n101 details { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.n101 details summary { cursor: pointer; color: var(--text); font-weight: 600; }
+.n101 details li { margin: 4px 0; line-height: 1.45; }
+@media (max-width: 700px) { .n101 .farrow { display: none; } .n101 .mailflow { grid-template-columns: 1fr; } }
 .legend { display: flex; gap: 14px 18px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .legend i { display: inline-block; width: 20px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
 
@@ -767,6 +818,7 @@ const REG = {
   overview: { label: "Overview", icon: "home", custom: renderOverview, auto: 1 },
   chat: { label: "Chat", icon: "chat", custom: renderChat, needs: ["groups", "messaging-groups", "wirings"] },
   topology: { label: "Topology", icon: "graph", custom: renderTopology, needs: ["groups", "messaging-groups", "wirings", "destinations"] },
+  nanoclaw101: { label: "NanoClaw 101", icon: "sparkle", custom: render101, needs: ["groups", "messaging-groups", "wirings", "destinations"] },
 
   groups: {
     label: "Agent Groups", icon: "bot", res: "groups",
@@ -1132,7 +1184,7 @@ const REG = {
 };
 
 const NAV_SECTIONS = [
-  { name: "", items: ["overview", "chat", "topology"] },
+  { name: "", items: ["overview", "chat", "topology", "nanoclaw101"] },
   { name: "Routing", items: ["groups", "messaging-groups", "wirings", "destinations"] },
   { name: "Runtime", items: ["sessions", "tasks", "approvals", "dropped-messages"] },
   { name: "Access", items: ["users", "roles", "members", "policies", "user-dms"] },
@@ -1999,29 +2051,106 @@ function topoZoom(delta) {
   const svg = $("#topo svg");
   if (svg) svg.style.width = Math.round(svg.dataset.w * S.topoZoom) + "px";
 }
-function renderTopology() {
-  const mgs = S.cache["messaging-groups"] || [];
-  const ags = S.cache.groups || [];
+// Deterministic per-channel accent color so the same channel always looks the
+// same across sessions (and matches nothing else by accident).
+function channelHue(ch) {
+  let h = 0; const s = String(ch || "");
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+const channelColor = ch => `hsl(${channelHue(ch)} 62% 52%)`;
+
+function topoFocusToggle(key) {
+  S.topoFocus = S.topoFocus === key ? null : key;
+  drawTopo();
+}
+function topoClearFocus() { S.topoFocus = null; drawTopo(); }
+function topoFilterInput(v) {
+  clearTimeout(S.topoFilterT);
+  S.topoFilterT = setTimeout(() => { S.topoFilter = v.trim().toLowerCase(); drawTopo(); }, 150);
+}
+
+function drawTopo() {
+  const holder = $("#topocanvas");
+  if (!holder) return;
+  const mgsRaw = S.cache["messaging-groups"] || [];
+  const ags = (S.cache.groups || []).slice();
   const wirings = S.cache.wirings || [];
   const dests = S.cache.destinations || [];
 
-  const NW = 240, NH = 46, GAPY = 16, COLGAP = 380, PAD = 30, TOP = 56;
+  // ---- sort: chats grouped by channel, agents pulled toward their chats ----
+  const mgs = mgsRaw.slice().sort((a, b) =>
+    String(a.channel_type).localeCompare(String(b.channel_type)) ||
+    String(a.name || a.platform_id).localeCompare(String(b.name || b.platform_id)));
+  const mgIdx = {}; mgs.forEach((m, i) => mgIdx[m.id] = i);
+  const agWired = {};
+  for (const w of wirings) (agWired[w.agent_group_id] = agWired[w.agent_group_id] || []).push(mgIdx[w.messaging_group_id]);
+  const bary = g => {
+    const xs = (agWired[g.id] || []).filter(i => i !== undefined);
+    return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : Infinity; // unwired sink to the bottom
+  };
+  ags.sort((a, b) => bary(a) - bary(b) || String(a.name).localeCompare(String(b.name)));
+
+  // ---- orphan detection ----
+  const wiredMg = new Set(wirings.map(w => w.messaging_group_id));
+  const activeAg = new Set([...wirings.map(w => w.agent_group_id), ...dests.map(d => d.agent_group_id)]);
+  const unwiredMgs = mgs.filter(m => !wiredMg.has(m.id)).length;
+
+  // ---- focus neighborhood ----
+  const focus = S.topoFocus;
+  const hl = new Set();
+  if (focus) {
+    hl.add(focus);
+    for (const w of wirings) {
+      if ("mg:" + w.messaging_group_id === focus) { hl.add("w:" + w.id); hl.add("ag:" + w.agent_group_id); }
+      if ("ag:" + w.agent_group_id === focus) { hl.add("w:" + w.id); hl.add("mg:" + w.messaging_group_id); }
+    }
+    dests.forEach((d, i) => {
+      const tgt = d.target_type === "channel" ? "mg:" + d.target_id : "ag:" + d.target_id;
+      if ("ag:" + d.agent_group_id === focus || tgt === focus) { hl.add("d:" + i); hl.add(tgt); hl.add("ag:" + d.agent_group_id); }
+    });
+  }
+  const q = S.topoFilter || "";
+  const mgMatch = m => !q || [m.name, m.platform_id, m.channel_type, m.instance].some(v => String(v || "").toLowerCase().includes(q));
+  const agMatch = g => !q || [g.name, g.folder].some(v => String(v || "").toLowerCase().includes(q));
+  const nodeDim = {};
+  mgs.forEach(m => nodeDim["mg:" + m.id] = focus ? !hl.has("mg:" + m.id) : !mgMatch(m));
+  ags.forEach(g => nodeDim["ag:" + g.id] = focus ? !hl.has("ag:" + g.id) : !agMatch(g));
+
+  const NW = 240, NH = 46, GAPY = 16, CHGAP = 14, COLGAP = 380, PAD = 30, TOP = 56;
   const mgY = {}, agY = {};
-  mgs.forEach((m, i) => mgY[m.id] = TOP + i * (NH + GAPY));
+  let y = TOP, prevCh = null;
+  mgs.forEach(m => {
+    if (prevCh !== null && m.channel_type !== prevCh) y += CHGAP;
+    prevCh = m.channel_type;
+    mgY[m.id] = y; y += NH + GAPY;
+  });
+  const mgBottom = y;
   ags.forEach((g, i) => agY[g.id] = TOP + i * (NH + GAPY));
-  const H = Math.max(mgs.length, ags.length) * (NH + GAPY) + TOP + PAD;
+  const H = Math.max(mgBottom, ags.length * (NH + GAPY) + TOP) + PAD;
   const x1 = PAD, x2 = PAD + NW + COLGAP;
   const W = x2 + NW + PAD + 70;
 
   const edgeVar = { mention: "var(--edge-mention)", "mention-sticky": "var(--edge-sticky)", pattern: "var(--edge-pattern)" };
   let svg = "";
-  svg += `<text class="colhead" x="${x1}" y="26">Messaging groups (${mgs.length})</text>`;
-  svg += `<text class="colhead" x="${x2}" y="26">Agent groups (${ags.length})</text>`;
+  svg += `<text class="colhead" x="${x1}" y="26">Chats — messaging groups (${mgs.length}${unwiredMgs ? `, ${unwiredMgs} unwired` : ""})</text>`;
+  svg += `<text class="colhead" x="${x2}" y="26">Agents — agent groups (${ags.length})</text>`;
 
-  const edge = (d, stroke, dash, title, onclick) =>
-    `<g${onclick ? ` onclick="${onclick}" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){${onclick}}"` : ""}>` +
-    `<path class="thit" d="${d}"><title>${title}</title></path>` +
-    `<path class="tedge" stroke="${stroke}"${dash ? ` stroke-dasharray="${dash}"` : ""} d="${d}"/></g>`;
+  const cls = (key, kind) => {
+    const dim = focus ? !hl.has(key) : (kind === "edge" ? false : nodeDim[key]);
+    return dim ? " dim" : (focus && hl.has(key) ? " hl" : "");
+  };
+  const edgeDim = (key, aKey, bKey) =>
+    focus ? !hl.has(key) : (nodeDim[aKey] || nodeDim[bKey]);
+
+  const edge = (key, aKey, bKey, d, stroke, dash, title, onclick, label, lx, ly) => {
+    const dim = edgeDim(key, aKey, bKey);
+    const lab = label && focus && hl.has(key)
+      ? `<g class="tlabel"><rect x="${lx - label.length * 3.6 - 6}" y="${ly - 10}" width="${label.length * 7.2 + 12}" height="18" rx="9"/><text x="${lx}" y="${ly + 3}" text-anchor="middle">${esc(label)}</text></g>` : "";
+    return `<g class="tedge-g${dim ? " dim" : ""}"${onclick ? ` onclick="${onclick}" role="button" tabindex="${dim ? -1 : 0}" onkeydown="if(event.key==='Enter'){${onclick}}"` : ""}>` +
+      `<path class="thit" d="${d}"><title>${title}</title></path>` +
+      `<path class="tedge" stroke="${stroke}"${dash ? ` stroke-dasharray="${dash}"` : ""} d="${d}"/>${lab}</g>`;
+  };
 
   for (const w of wirings) {
     const ya = mgY[w.messaging_group_id], yb = agY[w.agent_group_id];
@@ -2030,65 +2159,101 @@ function renderTopology() {
     const c = edgeVar[w.engage_mode] || "var(--muted)";
     const d = `M${sx},${sy} C${sx + COLGAP / 2},${sy} ${ex - COLGAP / 2},${ey} ${ex},${ey}`;
     const t = `wiring — ${esc(mgName(w.messaging_group_id))} → ${esc(agName(w.agent_group_id))} · engage=${esc(w.engage_mode)}${w.engage_pattern ? " /" + esc(w.engage_pattern) + "/" : ""} · session=${esc(w.session_mode)}`;
-    svg += edge(d, c, "", t, `topoOpen('wirings','${esc(w.id)}')`);
+    const label = w.engage_mode + (w.engage_pattern ? ` /${trunc(w.engage_pattern, 12)}/` : "");
+    svg += edge("w:" + w.id, "mg:" + w.messaging_group_id, "ag:" + w.agent_group_id,
+      d, c, "", t, `topoOpen('wirings','${esc(w.id)}')`, label, (sx + ex) / 2, (sy + ey) / 2);
   }
-  for (const d of dests) {
-    if (d.target_type === "channel") {
-      const ya = agY[d.agent_group_id], yb = mgY[d.target_id];
-      if (ya === undefined || yb === undefined) continue;
+  dests.forEach((dst, i) => {
+    if (dst.target_type === "channel") {
+      const ya = agY[dst.agent_group_id], yb = mgY[dst.target_id];
+      if (ya === undefined || yb === undefined) return;
       const sx = x2, sy = ya + NH / 2 + 8, ex = x1 + NW, ey = yb + NH / 2 + 8;
       const p = `M${sx},${sy} C${sx - COLGAP / 2},${sy} ${ex + COLGAP / 2},${ey} ${ex},${ey}`;
-      svg += edge(p, "var(--edge-dest)", "5 4", `destination "${esc(d.local_name)}" — ${esc(agName(d.agent_group_id))} sends → ${esc(mgName(d.target_id))}`);
+      svg += edge("d:" + i, "ag:" + dst.agent_group_id, "mg:" + dst.target_id,
+        p, "var(--edge-dest)", "5 4", `destination "${esc(dst.local_name)}" — ${esc(agName(dst.agent_group_id))} sends → ${esc(mgName(dst.target_id))}`,
+        null, `replies as "${trunc(dst.local_name, 14)}"`, (sx + ex) / 2, (sy + ey) / 2);
     } else {
-      const ya = agY[d.agent_group_id], yb = agY[d.target_id];
-      if (ya === undefined || yb === undefined) continue;
+      const ya = agY[dst.agent_group_id], yb = agY[dst.target_id];
+      if (ya === undefined || yb === undefined) return;
       const sx = x2 + NW, sy = ya + NH / 2, ey = yb + NH / 2;
       const bow = 40 + Math.abs(ey - sy) / 6;
       const p = `M${sx},${sy} C${sx + bow},${sy} ${sx + bow},${ey} ${sx},${ey}`;
-      svg += edge(p, "var(--edge-a2a)", "2 4", `A2A destination "${esc(d.local_name)}" — ${esc(agName(d.agent_group_id))} → ${esc(agName(d.target_id))}`);
+      svg += edge("d:" + i, "ag:" + dst.agent_group_id, "ag:" + dst.target_id,
+        p, "var(--edge-a2a)", "2 4", `A2A destination "${esc(dst.local_name)}" — ${esc(agName(dst.agent_group_id))} → ${esc(agName(dst.target_id))}`,
+        null, "A2A", sx + bow, (sy + ey) / 2);
     }
-  }
+  });
   mgs.forEach(m => {
-    const y = mgY[m.id];
-    svg += `<g class="tnode" transform="translate(${x1},${y})" role="button" tabindex="0" onclick="topoOpen('messaging-groups','${esc(m.id)}')" onkeydown="if(event.key==='Enter'){topoOpen('messaging-groups','${esc(m.id)}')}">
+    const y = mgY[m.id], key = "mg:" + m.id, orphan = !wiredMg.has(m.id);
+    svg += `<g class="tnode${cls(key, "node")}${orphan ? " orphan" : ""}" transform="translate(${x1},${y})" role="button" tabindex="0" aria-pressed="${focus === key}"
+      onclick="topoFocusToggle('${esc(key)}')" onkeydown="if(event.key==='Enter'){topoFocusToggle('${esc(key)}')}">
       <rect width="${NW}" height="${NH}" rx="12"></rect>
-      <text x="12" y="19">${esc(trunc(m.name || m.platform_id, 26))}</text>
-      <text x="12" y="35" class="sub">${esc(m.channel_type)} · ${m.is_group ? "group" : "DM"} · ${esc(m.unknown_sender_policy)}</text>
-      <title>${esc(m.id)} — ${esc(m.platform_id)}</title></g>`;
+      <rect class="accent" x="0" y="6" width="4" height="${NH - 12}" rx="2" fill="${channelColor(m.channel_type)}"></rect>
+      <text x="14" y="19">${esc(trunc(m.name || m.platform_id, 25))}</text>
+      <text x="14" y="35" class="sub">${esc(m.channel_type)} · ${m.is_group ? "group" : "DM"} · ${esc(m.unknown_sender_policy)}${orphan ? " · unwired" : ""}</text>
+      <title>${esc(m.id)} — ${esc(m.platform_id)}${orphan ? " — no wiring: messages here reach no agent" : ""}</title></g>`;
   });
   ags.forEach(g => {
-    const y = agY[g.id];
-    svg += `<g class="tnode" transform="translate(${x2},${y})" role="button" tabindex="0" onclick="topoOpen('groups','${esc(g.id)}')" onkeydown="if(event.key==='Enter'){topoOpen('groups','${esc(g.id)}')}">
+    const y = agY[g.id], key = "ag:" + g.id, idle = !activeAg.has(g.id);
+    svg += `<g class="tnode${cls(key, "node")}${idle ? " orphan" : ""}" transform="translate(${x2},${y})" role="button" tabindex="0" aria-pressed="${focus === key}"
+      onclick="topoFocusToggle('${esc(key)}')" onkeydown="if(event.key==='Enter'){topoFocusToggle('${esc(key)}')}">
       <rect width="${NW}" height="${NH}" rx="12"></rect>
       <text x="12" y="19">${esc(trunc(g.name, 26))}</text>
-      <text x="12" y="35" class="sub">${esc(g.folder)}</text>
-      <title>${esc(g.id)}</title></g>`;
+      <text x="12" y="35" class="sub">${esc(g.folder)}${idle ? " · not wired anywhere" : ""}</text>
+      <title>${esc(g.id)}${idle ? " — no wiring or destination references this agent" : ""}</title></g>`;
   });
 
+  holder.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" data-w="${W}" role="img" aria-label="Fleet topology graph"${focus ? ' class="focused"' : ""}>${svg}</svg>`;
+
+  // focus bar
+  const bar = $("#topofocusbar");
+  if (bar) {
+    if (!focus) { bar.hidden = true; bar.innerHTML = ""; }
+    else {
+      const isMg = focus.startsWith("mg:"), id = focus.slice(focus.indexOf(":") + 1);
+      const name = isMg ? mgName(id) : agName(id);
+      const n = [...hl].filter(k => k.startsWith("w:")).length, nd = [...hl].filter(k => k.startsWith("d:")).length;
+      bar.hidden = false;
+      bar.innerHTML = `${ico(isMg ? "mail" : "bot")}<b>${esc(name)}</b>
+        <span class="count">${n} wiring${n === 1 ? "" : "s"} · ${nd} destination${nd === 1 ? "" : "s"}</span>
+        <button class="btn sm" onclick="topoOpen('${isMg ? "messaging-groups" : "groups"}','${esc(id)}')">Open ${isMg ? "chat" : "agent"} ↗</button>
+        <button class="btn sm" onclick="topoClearFocus()">Clear focus</button>`;
+    }
+  }
+  if (window.innerWidth < 900 && !S.topoZoomed) { S.topoZoom = 0.6; S.topoZoomed = true; }
+  const svgEl = $("#topo svg");
+  if (svgEl) svgEl.style.width = Math.round(svgEl.dataset.w * S.topoZoom) + "px";
+}
+
+function renderTopology() {
+  S.topoZoomed = false;
   $("#main").innerHTML = `
     <div class="pagehead">
       <div class="toprow"><h2>Topology</h2></div>
-      <div class="desc">Messaging groups → wirings → agent groups, plus destination ACL edges. Tap an edge or node to open it.</div>
+      <div class="desc">Chats on the left, agents on the right, wirings between them. <b>Click a node to focus its connections</b> (click again or Clear to unfocus); click an edge to open the wiring. New here? See <a href="#" onclick="nav('nanoclaw101');return false">NanoClaw 101</a>.</div>
     </div>
     <div id="topo">
       <div class="topo-tools">
+        <input id="topofilter" type="search" placeholder="Filter — name, channel, folder…" aria-label="Filter topology nodes" oninput="topoFilterInput(this.value)">
         <button class="btn icon sm" onclick="topoZoom(-0.2)" aria-label="Zoom out">${ico("zoom-out")}</button>
         <button class="btn icon sm" onclick="topoZoom(0.2)" aria-label="Zoom in">${ico("zoom-in")}</button>
         <button class="btn sm" onclick="topoZoom(0)">Reset</button>
         <div class="spacer"></div>
         <button class="btn icon sm" onclick="refresh()" aria-label="Refresh">${ico("refresh")}</button>
       </div>
-      <div class="canvas"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" data-w="${W}" role="img" aria-label="Fleet topology graph">${svg}</svg></div>
+      <div id="topofocusbar" class="topo-focusbar" hidden></div>
+      <div class="canvas" id="topocanvas"></div>
       <div class="legend">
         <span><i style="background:var(--edge-mention)"></i>wiring: mention</span>
         <span><i style="background:var(--edge-sticky)"></i>wiring: mention-sticky</span>
         <span><i style="background:var(--edge-pattern)"></i>wiring: pattern</span>
         <span><i style="background:var(--edge-dest)"></i>destination → channel</span>
         <span><i style="background:var(--edge-a2a)"></i>destination → agent (A2A)</span>
+        <span><i class="orph"></i>unwired / unreferenced</span>
       </div>
     </div>`;
-  topoZoom(0);
-  if (window.innerWidth < 900) topoZoom(-0.4);
+  const f = $("#topofilter"); if (f && S.topoFilter) f.value = S.topoFilter;
+  drawTopo();
 }
 function trunc(s, n) { s = String(s ?? ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 function topoOpen(page, id) {
@@ -2098,6 +2263,130 @@ function topoOpen(page, id) {
     const i = S.rendered.findIndex(r => r.id === id);
     if (i >= 0) openDetail(page, i);
   });
+}
+
+/* ============================ NanoClaw 101 =========================== */
+function render101() {
+  const mgs = S.cache["messaging-groups"] || [];
+  const ags = S.cache.groups || [];
+  const ws = S.cache.wirings || [];
+  const dests = S.cache.destinations || [];
+  const exMg = mgs.find(m => m.name) || mgs[0];
+  const exAg = ags[0];
+  const exW = ws[0];
+  const exDest = dests.find(d => d.target_type === "channel") || dests[0];
+
+  const step = (n, fc, icon, title, sub) => `
+    <div class="fstep" style="--fc:${fc}"><div class="n">STEP ${n} ${icon}</div><b>${title}</b><span>${sub}</span></div>`;
+  const arrow = `<div class="farrow" aria-hidden="true">➜</div>`;
+  const term = (icon, name, one, ex, page) => `
+    <div class="term">
+      <div class="thead">${ico(icon)}${name}</div>
+      <p>${one}</p>
+      ${ex ? `<span class="ex">${ex}</span>` : ""}
+      <a href="#" onclick="nav('${page}');return false">See yours${S.cache[page] ? ` (${S.cache[page].length})` : ""} →</a>
+    </div>`;
+  const bub = (txt, wake, why) => `<div class="bub2${wake ? " wake" : ""}">${esc(txt)}<span class="r">${wake ? "🔔 wakes" : "💤 ignored"}${why ? " · " + why : ""}</span></div>`;
+
+  $("#main").innerHTML = `<div class="n101">
+    <div class="pagehead">
+      <div class="toprow"><h2>NanoClaw 101</h2></div>
+      <div class="desc">The whole system in five pictures. Every colored word here uses the <b>same colors as the Topology graph</b>.</div>
+    </div>
+
+    <div class="sect">
+      <h3>${ico("home")}Your install, right now</h3>
+      <p class="lead">One NanoClaw = many <b>agents</b>, each wired to some of your <b>chats</b>. That's the whole game.</p>
+      <div class="livechips">
+        <button onclick="nav('groups')">🤖 <b>${ags.length}</b> agents</button>
+        <button onclick="nav('messaging-groups')">💬 <b>${mgs.length}</b> chats</button>
+        <button onclick="nav('wirings')">🔀 <b>${ws.length}</b> wirings</button>
+        <button onclick="nav('destinations')">📮 <b>${dests.length}</b> reply addresses</button>
+        <button onclick="nav('topology')">🗺 see the map</button>
+      </div>
+    </div>
+
+    <div class="sect">
+      <h3>${ico("send")}The journey of one message</h3>
+      <p class="lead">You text your WhatsApp group. Three seconds later the agent answers. This is what happened in between:</p>
+      <div class="flow">
+        ${step(1, "var(--acc)", "💬", "You send a message", "in WhatsApp, Telegram, Discord, Matrix…")}${arrow}
+        ${step(2, "var(--edge-dest)", "🔌", "Adapter picks it up", "the plug that speaks that platform's language")}${arrow}
+        ${step(3, "var(--edge-sticky)", "🪪", "Messaging group", "NanoClaw looks up the chat's ID card: which chat, which channel, group or DM")}${arrow}
+        ${step(4, "var(--edge-mention)", "🔀", "Wiring decides", "is an agent wired to this chat, and should it wake for THIS message?")}${arrow}
+        ${step(5, "var(--edge-pattern)", "🤖", "Agent group thinks", "the agent — its personality, files and memory — runs in a sandboxed container")}${arrow}
+        ${step(6, "var(--edge-a2a)", "📮", "Reply via destination", "the agent may only send to its allowed addresses — the reply lands back in your chat")}
+      </div>
+      <details><summary>Nerd corner: how the message physically moves</summary>
+        <ul>
+          <li>No pipes, no sockets between host and agent — just <b>two SQLite mailboxes</b> per session: host writes <code>inbound.db</code> 📥, container reads it; container writes <code>outbound.db</code> 📤, host delivers it.</li>
+          <li>Every action you take here is an <code>ncl</code> CLI command under the hood — each toast shows the exact command it ran.</li>
+        </ul>
+      </details>
+    </div>
+
+    <div class="sect">
+      <h3>${ico("sparkle")}The six words that explain everything</h3>
+      <div class="terms">
+        ${term("mail", "Messaging group", "One chat on one platform — a WhatsApp group, a Telegram DM, a Discord channel. It's the chat's ID card in NanoClaw.",
+          exMg ? esc(`${exMg.channel_type} · "${trunc(exMg.name || exMg.platform_id, 22)}" · ${exMg.is_group ? "group" : "DM"}`) : null, "messaging-groups")}
+        ${term("bot", "Agent group", "One agent: its personality, workspace folder, memory and container settings. One agent can serve many chats.",
+          exAg ? esc(`"${trunc(exAg.name, 22)}" · groups/${trunc(exAg.folder, 18)}/`) : null, "groups")}
+        ${term("link", "Wiring", "The routing rule connecting a chat to an agent: WHEN to wake (engage mode) and WHICH conversation to use (session mode).",
+          exW ? esc(`${trunc(mgName(exW.messaging_group_id), 16)} → ${trunc(agName(exW.agent_group_id), 16)} · ${exW.engage_mode}`) : null, "wirings")}
+        ${term("chat", "Session", "One running conversation: its history plus the container executing it. Born from a wiring when the first message arrives.",
+          null, "sessions")}
+        ${term("send", "Destination", "An allowed reply address for an agent. No destination = the agent literally cannot send there. Also how agents talk to each other (A2A).",
+          exDest ? esc(`"${trunc(exDest.local_name, 18)}" → ${exDest.target_type}`) : null, "destinations")}
+        ${term("zap", "Task", "A scheduled job for an agent — one-shot or recurring (cron). Fires in the group's timezone, wakes the agent like a message would.",
+          null, "tasks")}
+      </div>
+    </div>
+
+    <div class="sect">
+      <h3>${ico("zap")}When does an agent wake? — engage modes</h3>
+      <p class="lead">Every wiring picks one. Same colors as the wiring edges in <a href="#" onclick="nav('topology');return false">Topology</a>.</p>
+      <div class="modes">
+        <div class="mode" style="--mc:var(--edge-mention)"><b>mention</b>
+          <p>Only wakes when someone @-mentions the agent.</p>
+          <div class="mchat">${bub("morning everyone ☕", false)}${bub("@Casa what's for dinner?", true, "mentioned")}${bub("lol", false)}</div>
+        </div>
+        <div class="mode" style="--mc:var(--edge-sticky)"><b>mention-sticky</b>
+          <p>Wakes on a mention, then keeps listening to the follow-up conversation.</p>
+          <div class="mchat">${bub("@Casa plan the trip", true, "mentioned")}${bub("make it 3 days", true, "sticky")}${bub("(next day) hi all", false)}</div>
+        </div>
+        <div class="mode" style="--mc:var(--edge-pattern)"><b>pattern</b>
+          <p>Wakes when the message matches a regex. <code>"."</code> = every single message (always-on).</p>
+          <div class="mchat">${bub("anything at all", true, 'matches "."')}${bub("deploy failed!", true, "matches")}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <h3>${ico("chat")}Which conversation does it remember? — session modes</h3>
+      <div class="modes">
+        <div class="mode" style="--mc:var(--edge-mention)"><b>shared</b><p>Everyone in the chat shares one conversation with the agent. The default for a group chat.</p></div>
+        <div class="mode" style="--mc:var(--edge-sticky)"><b>per-thread</b><p>Each platform thread gets its own separate conversation. Great for Slack/Discord threads.</p></div>
+        <div class="mode" style="--mc:var(--edge-pattern)"><b>agent-shared</b><p>ALL chats wired to this agent share one conversation — the agent sees everything in one stream.</p></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <h3>${ico("shield")}Who gets in? — strangers &amp; roles</h3>
+      <p class="lead">Each chat has an <b>unknown-sender policy</b> — what happens when someone NanoClaw doesn't know writes in:</p>
+      <div class="modes">
+        <div class="mode" style="--mc:var(--err, #d33)"><b>🚪 strict</b><p>Unknown senders are silently dropped. The closed door.</p></div>
+        <div class="mode" style="--mc:var(--warn)"><b>🔔 request_approval</b><p>An admin gets an approval card and decides. The doorbell.</p></div>
+        <div class="mode" style="--mc:var(--ok, #2a2)"><b>🟢 public</b><p>Anyone in the chat can talk to the agent. The open door.</p></div>
+      </div>
+      <details><summary>And who can administer?</summary>
+        <ul>
+          <li><b>owner / admin</b> — can manage agents, wirings and approvals (global, or scoped to one agent). Lives in <a href="#" onclick="nav('roles');return false">Roles</a>.</li>
+          <li><b>member</b> — plain access to an agent without admin powers. Lives in <a href="#" onclick="nav('members');return false">Members</a>.</li>
+        </ul>
+      </details>
+    </div>
+  </div>`;
 }
 
 /* ================================ chat =============================== */
