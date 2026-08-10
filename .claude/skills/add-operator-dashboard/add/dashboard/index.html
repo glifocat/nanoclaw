@@ -465,6 +465,13 @@ details.raw summary:hover { color: var(--ink); }
 .explain101 > .n101 { padding: 4px 12px 12px; gap: 12px; }
 .explain101 .sect { padding: 12px; background: transparent; border-style: dashed; }
 .explain101.inmodal { margin: 4px 0 10px; }
+.explain101 .fg-foot { font-size: 12px; padding-top: 2px; }
+.n101 .fg-entry { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.n101 .fg-entry .sect { border-style: dashed; padding: 12px; margin-top: 8px; }
+.n101 .fg-head { display: flex; align-items: center; gap: 8px; font-size: 13.5px; flex-wrap: wrap; }
+.n101 .fg-head .ic { width: 16px; height: 16px; color: var(--acc); }
+.n101 .fg-head .count { font-weight: 400; }
+.n101 .fg-head a { margin-left: auto; font-size: 12px; white-space: nowrap; }
 
 /* ================= NanoClaw 101 ================= */
 .n101 { display: flex; flex-direction: column; gap: 18px; }
@@ -978,7 +985,6 @@ const REG = {
   sessions: {
     label: "Sessions", icon: "zap", res: "sessions", auto: 1,
     desc: "Runtime units — one (agent group, messaging group, thread) per container.",
-    explain: explainSessions,
     empty: { t: "No sessions yet", h: "A session appears the first time an agent wakes up for a chat." },
     needs: ["sessions", "groups", "messaging-groups"],
     cols: [
@@ -994,7 +1000,6 @@ const REG = {
   tasks: {
     label: "Tasks", icon: "refresh", res: "tasks",
     desc: "Scheduled tasks per agent group — recurring (cron) series and one-shots, with per-series run history.",
-    explain: explainTasks,
     empty: { t: "No live tasks", h: "Schedule a recurring series or a one-shot and the agent wakes on its own." },
     needs: ["tasks", "groups"],
     cols: [
@@ -1091,7 +1096,6 @@ const REG = {
   roles: {
     label: "Roles", icon: "shield", res: "roles",
     desc: "Privilege grants. owner = global full control; admin can be global or scoped to one agent group.",
-    explain: explainRoles,
     empty: { t: "No roles granted", h: "Grant admin or owner to the people you trust with the fleet." },
     needs: ["roles", "users", "groups"],
     cols: [
@@ -1157,7 +1161,6 @@ const REG = {
   approvals: {
     label: "Approvals", icon: "check-c", res: "approvals", auto: 1,
     desc: "In-flight approval cards waiting for an admin response (read-only; respond from the channel).",
-    explain: explainApprovals,
     empty: { t: "Nothing needs your sign-off", h: "When an agent asks permission for something, it lands here." },
     needs: ["approvals", "groups"],
     cols: [
@@ -1334,7 +1337,7 @@ function renderTablePage(page, loading) {
         <span class="count" id="rowcount"></span>
       </div>
       <div class="desc">${def.desc || ""}</div>
-      ${def.explain ? `<details class="explain101"><summary>${ico("sparkle")} How ${esc(def.label.toLowerCase())} work — the 60-second visual</summary><div class="n101">${def.explain()}</div></details>` : ""}
+      ${explainPanel(page)}
       <div class="toolbar">
         <label class="search"><span class="sr">Filter rows</span>${ico("search")}<input placeholder="Filter…" value="${esc(S.filter)}" oninput="S.filter=this.value;renderRows('${page}')"></label>
         <select id="sortsel" aria-label="Sort by" onchange="setSortSel('${page}',this.value)"><option value="">Sort…</option>${sortOpts}</select>
@@ -2296,6 +2299,35 @@ const n101Arrow = `<div class="farrow" aria-hidden="true">➜</div>`;
 const n101Bub = (txt, wake, why) => `<div class="bub2${wake ? " wake" : ""}">${esc(txt)}<span class="r">${wake ? "🔔 wakes" : "💤 ignored"}${why ? " · " + why : ""}</span></div>`;
 const n101Mode = (mc, title, body) => `<div class="mode" style="--mc:${mc}"><b>${title}</b><p>${body}</p></div>`;
 
+// Shared concept blocks — used by the 101 screen AND per-screen explainers.
+const n101EngageModes = () => `
+      <div class="modes">
+        <div class="mode" style="--mc:var(--edge-mention)"><b>mention</b>
+          <p>Only wakes when someone @-mentions the agent.</p>
+          <div class="mchat">${n101Bub("morning everyone ☕", false)}${n101Bub("@Casa what's for dinner?", true, "mentioned")}${n101Bub("lol", false)}</div>
+        </div>
+        <div class="mode" style="--mc:var(--edge-sticky)"><b>mention-sticky</b>
+          <p>Wakes on a mention, then keeps listening to the follow-up conversation.</p>
+          <div class="mchat">${n101Bub("@Casa plan the trip", true, "mentioned")}${n101Bub("make it 3 days", true, "sticky")}${n101Bub("(next day) hi all", false)}</div>
+        </div>
+        <div class="mode" style="--mc:var(--edge-pattern)"><b>pattern</b>
+          <p>Wakes when the message matches a regex. <code>"."</code> = every single message (always-on).</p>
+          <div class="mchat">${n101Bub("anything at all", true, 'matches "."')}${n101Bub("deploy failed!", true, "matches")}</div>
+        </div>
+      </div>`;
+const n101SessionModes = () => `
+      <div class="modes">
+        <div class="mode" style="--mc:var(--edge-mention)"><b>shared</b><p>Everyone in the chat shares one conversation with the agent. The default for a group chat.</p></div>
+        <div class="mode" style="--mc:var(--edge-sticky)"><b>per-thread</b><p>Each platform thread gets its own separate conversation. Great for Slack/Discord threads.</p></div>
+        <div class="mode" style="--mc:var(--edge-pattern)"><b>agent-shared</b><p>ALL chats wired to this agent share one conversation — the agent sees everything in one stream.</p></div>
+      </div>`;
+const n101Doors = () => `
+      <div class="modes">
+        <div class="mode" style="--mc:var(--err, #d33)"><b>🚪 strict</b><p>Unknown senders are silently dropped. The closed door.</p></div>
+        <div class="mode" style="--mc:var(--warn)"><b>🔔 request_approval</b><p>An admin gets an approval card and decides. The doorbell.</p></div>
+        <div class="mode" style="--mc:var(--ok, #2a2)"><b>🟢 public</b><p>Anyone in the chat can talk to the agent. The open door.</p></div>
+      </div>`;
+
 // Deep link into a 101 section from any screen.
 function nav101(anchor) {
   nav("nanoclaw101").then(() => {
@@ -2338,6 +2370,7 @@ function render101() {
         <button onclick="nav('wirings')">🔀 <b>${ws.length}</b> wirings</button>
         <button onclick="nav('destinations')">📮 <b>${dests.length}</b> reply addresses</button>
         <button onclick="nav('topology')">🗺 see the map</button>
+        <button onclick="nav101('n101-guide')">📖 field guide — every screen</button>
       </div>
     </div>
 
@@ -2381,45 +2414,39 @@ function render101() {
     <div class="sect" id="n101-engage">
       <h3>${ico("zap")}When does an agent wake? — engage modes</h3>
       <p class="lead">Every wiring picks one. Same colors as the wiring edges in <a href="#" onclick="nav('topology');return false">Topology</a>.</p>
-      <div class="modes">
-        <div class="mode" style="--mc:var(--edge-mention)"><b>mention</b>
-          <p>Only wakes when someone @-mentions the agent.</p>
-          <div class="mchat">${bub("morning everyone ☕", false)}${bub("@Casa what's for dinner?", true, "mentioned")}${bub("lol", false)}</div>
-        </div>
-        <div class="mode" style="--mc:var(--edge-sticky)"><b>mention-sticky</b>
-          <p>Wakes on a mention, then keeps listening to the follow-up conversation.</p>
-          <div class="mchat">${bub("@Casa plan the trip", true, "mentioned")}${bub("make it 3 days", true, "sticky")}${bub("(next day) hi all", false)}</div>
-        </div>
-        <div class="mode" style="--mc:var(--edge-pattern)"><b>pattern</b>
-          <p>Wakes when the message matches a regex. <code>"."</code> = every single message (always-on).</p>
-          <div class="mchat">${bub("anything at all", true, 'matches "."')}${bub("deploy failed!", true, "matches")}</div>
-        </div>
-      </div>
+${n101EngageModes()}
     </div>
 
     <div class="sect" id="n101-sessionmodes">
       <h3>${ico("chat")}Which conversation does it remember? — session modes</h3>
-      <div class="modes">
-        <div class="mode" style="--mc:var(--edge-mention)"><b>shared</b><p>Everyone in the chat shares one conversation with the agent. The default for a group chat.</p></div>
-        <div class="mode" style="--mc:var(--edge-sticky)"><b>per-thread</b><p>Each platform thread gets its own separate conversation. Great for Slack/Discord threads.</p></div>
-        <div class="mode" style="--mc:var(--edge-pattern)"><b>agent-shared</b><p>ALL chats wired to this agent share one conversation — the agent sees everything in one stream.</p></div>
-      </div>
+${n101SessionModes()}
     </div>
 
     <div class="sect" id="n101-doors">
       <h3>${ico("shield")}Who gets in? — strangers &amp; roles</h3>
       <p class="lead">Each chat has an <b>unknown-sender policy</b> — what happens when someone NanoClaw doesn't know writes in:</p>
-      <div class="modes">
-        <div class="mode" style="--mc:var(--err, #d33)"><b>🚪 strict</b><p>Unknown senders are silently dropped. The closed door.</p></div>
-        <div class="mode" style="--mc:var(--warn)"><b>🔔 request_approval</b><p>An admin gets an approval card and decides. The doorbell.</p></div>
-        <div class="mode" style="--mc:var(--ok, #2a2)"><b>🟢 public</b><p>Anyone in the chat can talk to the agent. The open door.</p></div>
-      </div>
+${n101Doors()}
       <details><summary>And who can administer?</summary>
         <ul>
           <li><b>owner / admin</b> — can manage agents, wirings and approvals (global, or scoped to one agent). Lives in <a href="#" onclick="nav('roles');return false">Roles</a>.</li>
           <li><b>member</b> — plain access to an agent without admin powers. Lives in <a href="#" onclick="nav('members');return false">Members</a>.</li>
         </ul>
       </details>
+    </div>
+
+    <div class="sect" id="n101-guide">
+      <h3>${ico("eye")}Field guide — every screen, explained</h3>
+      <p class="lead">The same visuals that sit on each screen, collected in one place. Jump to a screen with its <i>open</i> link.</p>
+      ${Object.entries(EXPLAINERS).map(([k, e]) => `
+        <div class="fg-entry" id="n101-fg-${k}">
+          <div class="fg-head">${ico(REG[k] ? REG[k].icon : "sparkle")}<b>${esc(REG[k] ? REG[k].label : k)}</b><span class="count">${esc(e.title)}</span><a href="#" onclick="nav('${k}');return false">open →</a></div>
+          ${e.fn()}
+        </div>`).join("")}
+      ${EXPLAINERS_EXTRA.map(x => `
+        <div class="fg-entry" id="n101-fg-${x.id}">
+          <div class="fg-head">${ico(x.icon)}<b>${esc(x.label)}</b><span class="count">${esc(x.title)}</span></div>
+          ${x.fn()}
+        </div>`).join("")}
     </div>
   </div>`;
 }
@@ -2536,6 +2563,150 @@ function explainConfig() {
     </div>`;
 }
 
+function explainGroups() {
+  return `
+    <div class="sect">
+      <h3>${ico("bot")}What an agent group is</h3>
+      <div class="modes">
+        ${n101Mode("var(--edge-pattern)", "🧠 The brain", "Personality and memory — a persona file plus a memory tree the agent keeps between conversations.")}
+        ${n101Mode("var(--edge-mention)", "📁 The workspace", "A real folder on the host (<code>groups/&lt;folder&gt;/</code>) where it keeps files, scripts, notes.")}
+        ${n101Mode("var(--edge-sticky)", "📦 The container config", "Which model, which packages, which tools, how much CLI power (see the Config drawer on any row).")}
+      </div>
+      <details><summary>One agent, many chats</summary><ul>
+        <li>An agent group is not a chat — <b>wirings</b> connect it to any number of chats, and <b>session mode</b> decides how much those chats share.</li>
+      </ul></details>
+    </div>`;
+}
+
+function explainMgs() {
+  return `
+    <div class="sect">
+      <h3>${ico("mail")}What a messaging group is</h3>
+      <p class="lead">One chat on one platform — its ID card in NanoClaw: channel, platform ID, group-or-DM. Nothing happens here until a <b>wiring</b> connects it to an agent.</p>
+      <p class="lead" style="margin-bottom:6px">Every chat also picks what happens when a <b>stranger</b> writes in:</p>
+      ${n101Doors()}
+    </div>`;
+}
+
+function explainWirings() {
+  return `
+    <div class="sect">
+      <h3>${ico("zap")}When does the agent wake? — engage modes</h3>
+      ${n101EngageModes()}
+    </div>
+    <div class="sect">
+      <h3>${ico("chat")}Which conversation does it remember? — session modes</h3>
+      ${n101SessionModes()}
+      <details><summary>The other two knobs</summary><ul>
+        <li><b>threads</b> — honor platform threads or flatten them; empty inherits the channel's default.</li>
+        <li><b>priority</b> — when several agents are wired to one chat, higher priority engages first.</li>
+      </ul></details>
+    </div>`;
+}
+
+function explainDests() {
+  return `
+    <div class="sect">
+      <h3>${ico("send")}How replies find their way</h3>
+      <div class="modes">
+        ${n101Mode("var(--edge-dest)", "📮 Allowed addresses only", "An agent can ONLY send where it has a destination. No destination = it literally cannot message that chat.")}
+        ${n101Mode("var(--edge-a2a)", "🤝 Agent targets = A2A", "A destination pointing at another agent lets them talk to each other — agent-to-agent messaging.")}
+        ${n101Mode("var(--warn)", "⚠️ Ambiguous names", "Auto-created names can collide for multi-channel agents — the agent then replies to the wrong chat. Rename them to something unmistakable.")}
+      </div>
+      <details><summary>Where they come from</summary><ul>
+        <li>Creating a wiring auto-creates the reply destination for that chat. Extra ones (other chats, other agents) are added here.</li>
+      </ul></details>
+    </div>`;
+}
+
+function explainMembers() {
+  return `
+    <div class="sect">
+      <h3>${ico("users")}The access gate</h3>
+      <div class="modes">
+        ${n101Mode("var(--acc)", "🎟 Member = plain access", "Lets a known user talk to an agent — no admin powers. This is the list the sender check consults.")}
+        ${n101Mode("var(--edge-sticky)", "🛡 Not the same as Roles", "Owner/admin live in Roles and carry privileges. Membership only opens the door to one agent.")}
+      </div>
+    </div>`;
+}
+
+function explainPolicies() {
+  return `
+    <div class="sect">
+      <h3>${ico("swap")}Agent-to-agent gates</h3>
+      <div class="modes">
+        ${n101Mode("var(--warn)", "🚧 A row = a checkpoint", "While a from → to row exists, EVERY message on that pair waits for a human approval card first.")}
+        ${n101Mode("var(--acc)", "➡️ Directed, per-pair", "Casa → Sprout gated doesn't gate Sprout → Casa. Remove the row and traffic flows freely again.")}
+      </div>
+    </div>`;
+}
+
+function explainUserDms() {
+  return `
+    <div class="sect">
+      <h3>${ico("user")}The cold-DM cache</h3>
+      <div class="modes">
+        ${n101Mode("var(--acc)", "📇 Remembered routes", "Where each user can be reached by DM per channel — learned so an agent can message someone who hasn't written first.")}
+        ${n101Mode("var(--muted)", "👀 Read-only", "Filled automatically as DMs happen; nothing to manage here.")}
+      </div>
+    </div>`;
+}
+
+function explainDropped() {
+  return `
+    <div class="sect">
+      <h3>${ico("drop")}Why messages land here</h3>
+      <div class="modes">
+        ${n101Mode("var(--err)", "🚪 The strict door closed", "Someone unknown wrote in a chat whose stranger policy is strict — the message was dropped, and logged here as evidence.")}
+        ${n101Mode("var(--acc)", "🔓 To let them in", "Add the sender as a user + member (or switch the chat's policy) — nothing here is retried automatically.")}
+      </div>
+    </div>`;
+}
+
+function explainChat() {
+  return `
+    <div class="sect">
+      <h3>${ico("chat")}How web chat plugs in</h3>
+      <div class="flow">
+        ${n101Step(1, "var(--acc)", "🔌", "One-time setup", "creates a private <code>webui:…</code> chat: messaging group + always-on wiring + reply destination")}${n101Arrow}
+        ${n101Step(2, "var(--edge-pattern)", "💬", "You chat here", "messages route through the REAL pipeline — same router, same container as any channel")}${n101Arrow}
+        ${n101Step(3, "var(--edge-a2a)", "👁", "Or watch a real chat", "picking a live session sends into that chat — replies land THERE, not here")}
+      </div>
+    </div>`;
+}
+
+// -------- central registry: one place that says which screen explains what --
+const EXPLAINERS = {
+  chat: { title: "How web chat plugs in", fn: explainChat },
+  groups: { title: "What an agent group is", fn: explainGroups },
+  "messaging-groups": { title: "What a messaging group is", fn: explainMgs },
+  wirings: { title: "How wirings decide", fn: explainWirings },
+  destinations: { title: "How replies find their way", fn: explainDests },
+  sessions: { title: "How a session lives (and why it's not replying)", fn: explainSessions },
+  tasks: { title: "When tasks fire and where output goes", fn: explainTasks },
+  approvals: { title: "The approval pipeline", fn: explainApprovals },
+  roles: { title: "Who can do what", fn: explainRoles },
+  members: { title: "The access gate", fn: explainMembers },
+  policies: { title: "Agent-to-agent gates", fn: explainPolicies },
+  "user-dms": { title: "The cold-DM cache", fn: explainUserDms },
+  "dropped-messages": { title: "Why messages land here", fn: explainDropped },
+};
+// Contextual explainers that live inside modals/drawers, listed in the field
+// guide alongside the per-screen ones.
+const EXPLAINERS_EXTRA = [
+  { id: "isolation", label: "Wiring creation", icon: "link", title: "Who should see whose history? — the 3 isolation setups", fn: explainIsolation },
+  { id: "config", label: "Group config drawer", icon: "bot", title: "cli_scope keycards + restart flavors", fn: explainConfig },
+];
+
+// The uniform panel every screen renders in the same slot (under the page
+// description). Same summary phrasing everywhere; footer links to the guide.
+function explainPanel(page) {
+  const e = EXPLAINERS[page];
+  if (!e) return "";
+  return `<details class="explain101"><summary>${ico("sparkle")} ${esc(e.title)} — 60-second visual</summary><div class="n101">${e.fn()}
+    <div class="fg-foot"><a href="#" onclick="nav101('n101-fg-${page}');return false">All explainers in one place → the 101 field guide</a></div></div></details>`;
+}
+
 /* ================================ chat =============================== */
 const CHAT_POLL_MS = 2500;
 const chatAgent = () => (S.cache.groups || []).find(g => g.id === S.chat?.ag) || { id: S.chat?.ag, name: S.chat?.ag || "?", folder: "" };
@@ -2568,6 +2739,7 @@ function renderChatPicker() {
     <div class="pagehead">
       <div class="toprow"><h2>Chat</h2><span class="count">${groups.length} agent${groups.length === 1 ? "" : "s"}</span></div>
       <div class="desc">Talk to any agent right here. Agents without a private line get a friendly one-time setup — everything it creates is named webui:… and removable.</div>
+      ${explainPanel("chat")}
     </div>
     ${groups.length ? `<div class="chatpick">${cards}</div>` : `<div class="empty"><div class="eico">${ico("chat")}</div><div class="t">No agents to talk to yet</div><div class="h">Create an agent group first — then come back and say hi.</div></div>`}`;
 }
