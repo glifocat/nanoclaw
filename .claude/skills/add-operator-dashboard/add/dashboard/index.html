@@ -455,6 +455,17 @@ details.raw summary:hover { color: var(--ink); }
 #topo .tlabel text { font-size: 11px; fill: var(--text); font-family: ui-monospace, monospace; }
 #topo .legend .orph { border: 1.5px dashed var(--warn); background: transparent !important; height: 12px; width: 16px; border-radius: 5px; }
 
+/* ---------- per-screen explainer panels ---------- */
+.explain101 { margin: 10px 0 2px; border: 1px dashed var(--line); border-radius: 12px; background: color-mix(in srgb, var(--acc) 4%, var(--surface)); }
+.explain101 > summary { cursor: pointer; padding: 9px 12px; font-size: 12.5px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 7px; list-style: none; }
+.explain101 > summary::-webkit-details-marker { display: none; }
+.explain101 > summary .ic { width: 15px; height: 15px; color: var(--acc); }
+.explain101 > summary::after { content: "▸"; margin-left: auto; color: var(--muted); transition: transform .15s; }
+.explain101[open] > summary::after { transform: rotate(90deg); }
+.explain101 > .n101 { padding: 4px 12px 12px; gap: 12px; }
+.explain101 .sect { padding: 12px; background: transparent; border-style: dashed; }
+.explain101.inmodal { margin: 4px 0 10px; }
+
 /* ================= NanoClaw 101 ================= */
 .n101 { display: flex; flex-direction: column; gap: 18px; }
 .n101 .sect { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; }
@@ -909,7 +920,8 @@ const REG = {
       { k: "session_mode", l: "Session", r: r => chip(r.session_mode) },
       { k: "ignored_message_policy", l: "Ignored msgs", r: r => chip(r.ignored_message_policy) },
     ],
-    create: { title: "New wiring", btn: "Create wiring", fields: [
+    create: { title: "New wiring", btn: "Create wiring",
+      explain: explainIsolation, explainLabel: "Who should see whose history? — the 3 isolation setups", fields: [
       { key: "messaging-group-id", label: "Messaging group", req: 1, type: "select", optionsFn: mgOpts },
       { key: "agent-group-id", label: "Agent group", req: 1, type: "select", optionsFn: agOpts },
       { key: "engage-mode", label: "Engage mode", type: "select", options: [{v:"",l:"— adapter default —"},...ENGAGE.map(v=>({v,l:v}))], help: "Adapter default resolves from the channel's declared defaults (DM vs group aware); undeclared channels fall back to mention." },
@@ -966,6 +978,7 @@ const REG = {
   sessions: {
     label: "Sessions", icon: "zap", res: "sessions", auto: 1,
     desc: "Runtime units — one (agent group, messaging group, thread) per container.",
+    explain: explainSessions,
     empty: { t: "No sessions yet", h: "A session appears the first time an agent wakes up for a chat." },
     needs: ["sessions", "groups", "messaging-groups"],
     cols: [
@@ -981,6 +994,7 @@ const REG = {
   tasks: {
     label: "Tasks", icon: "refresh", res: "tasks",
     desc: "Scheduled tasks per agent group — recurring (cron) series and one-shots, with per-series run history.",
+    explain: explainTasks,
     empty: { t: "No live tasks", h: "Schedule a recurring series or a one-shot and the agent wakes on its own." },
     needs: ["tasks", "groups"],
     cols: [
@@ -1077,6 +1091,7 @@ const REG = {
   roles: {
     label: "Roles", icon: "shield", res: "roles",
     desc: "Privilege grants. owner = global full control; admin can be global or scoped to one agent group.",
+    explain: explainRoles,
     empty: { t: "No roles granted", h: "Grant admin or owner to the people you trust with the fleet." },
     needs: ["roles", "users", "groups"],
     cols: [
@@ -1142,6 +1157,7 @@ const REG = {
   approvals: {
     label: "Approvals", icon: "check-c", res: "approvals", auto: 1,
     desc: "In-flight approval cards waiting for an admin response (read-only; respond from the channel).",
+    explain: explainApprovals,
     empty: { t: "Nothing needs your sign-off", h: "When an agent asks permission for something, it lands here." },
     needs: ["approvals", "groups"],
     cols: [
@@ -1318,6 +1334,7 @@ function renderTablePage(page, loading) {
         <span class="count" id="rowcount"></span>
       </div>
       <div class="desc">${def.desc || ""}</div>
+      ${def.explain ? `<details class="explain101"><summary>${ico("sparkle")} How ${esc(def.label.toLowerCase())} work — the 60-second visual</summary><div class="n101">${def.explain()}</div></details>` : ""}
       <div class="toolbar">
         <label class="search"><span class="sr">Filter rows</span>${ico("search")}<input placeholder="Filter…" value="${esc(S.filter)}" oninput="S.filter=this.value;renderRows('${page}')"></label>
         <select id="sortsel" aria-label="Sort by" onchange="setSortSel('${page}',this.value)"><option value="">Sort…</option>${sortOpts}</select>
@@ -1370,8 +1387,11 @@ function emptyHtml(def) {
       <button class="btn sm" onclick="S.filter='';renderTablePage(S.page)">Clear filter</button></div>`;
   }
   const e = def.empty || { t: "Nothing here yet", h: "" };
+  const N101_ANCHOR = { groups: "n101-terms", "messaging-groups": "n101-terms", wirings: "n101-engage", destinations: "n101-terms", sessions: "n101-journey", tasks: "n101-terms", roles: "n101-doors", members: "n101-doors", approvals: "n101-doors", "user-dms": "n101-doors", "dropped-messages": "n101-doors", policies: "n101-doors" };
+  const a = N101_ANCHOR[S.page];
   return `<div class="empty"><div class="eico">${ico("sparkle")}</div>
     <div class="t">${esc(e.t)}</div><div class="h">${esc(e.h)}</div>
+    ${a ? `<div class="h" style="margin-top:6px"><a href="#" onclick="nav101('${a}');return false">New to this? NanoClaw 101 explains it →</a></div>` : ""}
     ${def.create ? `<button class="btn pri" onclick="openCreate(S.page)">${ico("plus")} ${esc(def.create.btn || def.create.title)}</button>` : ""}</div>`;
 }
 
@@ -1527,6 +1547,7 @@ async function loadGroupConfig(g) {
     </div>`;
   slot.innerHTML = `
     <div class="note">${ico("alert")}<span>Scalar changes need a <b>restart</b>; package changes need <b>restart --rebuild</b>.</span></div>
+    <details class="explain101"><summary>${ico("sparkle")} What cli_scope and the restart flavors mean</summary><div class="n101">${explainConfig()}</div></details>
     <div class="dsec">Scalars</div>
     ${scalarField("provider", "Provider", c.provider, null, ["claude", "opencode", "codex"])}
     ${scalarField("model", "Model", c.model)}
@@ -1692,7 +1713,7 @@ function openCreate(page) {
   if (!c) return;
   formModal(c.title, `${def.res} ${c.verb || "create"}`, c.fields,
     vals => ncl(def.res, c.verb || "create", vals), () => refresh(),
-    { submitLabel: c.btn || "Create", note: c.after });
+    { submitLabel: c.btn || "Create", note: c.after, explain: c.explain ? c.explain() : null, explainLabel: c.explainLabel });
 }
 
 let modalSubmit = null;
@@ -1867,6 +1888,7 @@ function formModal(title, cmdLabel, fields, submitFn, onDone, opts = {}) {
     <div class="msub">ncl ${esc(cmdLabel)}</div>
     ${danger ? `<div class="confirm-danger">${ico("alert")}<span>This changes the live instance. Double-check before you go.</span></div>` : ""}
     ${note ? `<div class="note">${ico("alert")}<span>${esc(note)}</span></div>` : ""}
+    ${opts.explain ? `<details class="explain101 inmodal"><summary>${ico("sparkle")} ${esc(opts.explainLabel || "Not sure what to pick? — 60-second visual")}</summary><div class="n101">${opts.explain}</div></details>` : ""}
     ${fields.map(f => fieldHtml(f, "f-", fields)).join("")}
     <div class="fbtns">
       <button class="btn" onclick="closeModal()">Cancel</button>
@@ -2266,6 +2288,22 @@ function topoOpen(page, id) {
 }
 
 /* ============================ NanoClaw 101 =========================== */
+// Shared visual building blocks — used by the 101 screen AND the per-screen
+// "how this works" explainers.
+const n101Step = (n, fc, icon, title, sub) => `
+  <div class="fstep" style="--fc:${fc}"><div class="n">${typeof n === "number" ? "STEP " + n : n} ${icon}</div><b>${title}</b><span>${sub}</span></div>`;
+const n101Arrow = `<div class="farrow" aria-hidden="true">➜</div>`;
+const n101Bub = (txt, wake, why) => `<div class="bub2${wake ? " wake" : ""}">${esc(txt)}<span class="r">${wake ? "🔔 wakes" : "💤 ignored"}${why ? " · " + why : ""}</span></div>`;
+const n101Mode = (mc, title, body) => `<div class="mode" style="--mc:${mc}"><b>${title}</b><p>${body}</p></div>`;
+
+// Deep link into a 101 section from any screen.
+function nav101(anchor) {
+  nav("nanoclaw101").then(() => {
+    const el = document.getElementById(anchor);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 function render101() {
   const mgs = S.cache["messaging-groups"] || [];
   const ags = S.cache.groups || [];
@@ -2276,9 +2314,7 @@ function render101() {
   const exW = ws[0];
   const exDest = dests.find(d => d.target_type === "channel") || dests[0];
 
-  const step = (n, fc, icon, title, sub) => `
-    <div class="fstep" style="--fc:${fc}"><div class="n">STEP ${n} ${icon}</div><b>${title}</b><span>${sub}</span></div>`;
-  const arrow = `<div class="farrow" aria-hidden="true">➜</div>`;
+  const step = n101Step, arrow = n101Arrow, bub = n101Bub;
   const term = (icon, name, one, ex, page) => `
     <div class="term">
       <div class="thead">${ico(icon)}${name}</div>
@@ -2286,7 +2322,6 @@ function render101() {
       ${ex ? `<span class="ex">${ex}</span>` : ""}
       <a href="#" onclick="nav('${page}');return false">See yours${S.cache[page] ? ` (${S.cache[page].length})` : ""} →</a>
     </div>`;
-  const bub = (txt, wake, why) => `<div class="bub2${wake ? " wake" : ""}">${esc(txt)}<span class="r">${wake ? "🔔 wakes" : "💤 ignored"}${why ? " · " + why : ""}</span></div>`;
 
   $("#main").innerHTML = `<div class="n101">
     <div class="pagehead">
@@ -2294,7 +2329,7 @@ function render101() {
       <div class="desc">The whole system in five pictures. Every colored word here uses the <b>same colors as the Topology graph</b>.</div>
     </div>
 
-    <div class="sect">
+    <div class="sect" id="n101-live">
       <h3>${ico("home")}Your install, right now</h3>
       <p class="lead">One NanoClaw = many <b>agents</b>, each wired to some of your <b>chats</b>. That's the whole game.</p>
       <div class="livechips">
@@ -2306,7 +2341,7 @@ function render101() {
       </div>
     </div>
 
-    <div class="sect">
+    <div class="sect" id="n101-journey">
       <h3>${ico("send")}The journey of one message</h3>
       <p class="lead">You text your WhatsApp group. Three seconds later the agent answers. This is what happened in between:</p>
       <div class="flow">
@@ -2325,7 +2360,7 @@ function render101() {
       </details>
     </div>
 
-    <div class="sect">
+    <div class="sect" id="n101-terms">
       <h3>${ico("sparkle")}The six words that explain everything</h3>
       <div class="terms">
         ${term("mail", "Messaging group", "One chat on one platform — a WhatsApp group, a Telegram DM, a Discord channel. It's the chat's ID card in NanoClaw.",
@@ -2343,7 +2378,7 @@ function render101() {
       </div>
     </div>
 
-    <div class="sect">
+    <div class="sect" id="n101-engage">
       <h3>${ico("zap")}When does an agent wake? — engage modes</h3>
       <p class="lead">Every wiring picks one. Same colors as the wiring edges in <a href="#" onclick="nav('topology');return false">Topology</a>.</p>
       <div class="modes">
@@ -2362,7 +2397,7 @@ function render101() {
       </div>
     </div>
 
-    <div class="sect">
+    <div class="sect" id="n101-sessionmodes">
       <h3>${ico("chat")}Which conversation does it remember? — session modes</h3>
       <div class="modes">
         <div class="mode" style="--mc:var(--edge-mention)"><b>shared</b><p>Everyone in the chat shares one conversation with the agent. The default for a group chat.</p></div>
@@ -2371,7 +2406,7 @@ function render101() {
       </div>
     </div>
 
-    <div class="sect">
+    <div class="sect" id="n101-doors">
       <h3>${ico("shield")}Who gets in? — strangers &amp; roles</h3>
       <p class="lead">Each chat has an <b>unknown-sender policy</b> — what happens when someone NanoClaw doesn't know writes in:</p>
       <div class="modes">
@@ -2387,6 +2422,118 @@ function render101() {
       </details>
     </div>
   </div>`;
+}
+
+/* ---------------- per-screen "how this works" explainers ---------------- */
+// Rendered inside a collapsed <details class="explain101"> on their screen.
+function explainSessions() {
+  return `
+    <div class="sect">
+      <h3>${ico("chat")}How a session lives</h3>
+      <div class="flow">
+        ${n101Step(1, "var(--acc)", "📥", "Message arrives", "the host writes it into this session's <code>inbound.db</code> mailbox")}${n101Arrow}
+        ${n101Step(2, "var(--edge-dest)", "📦", "Container wakes", "a sandboxed Docker container for the agent group spawns (or is already up)")}${n101Arrow}
+        ${n101Step(3, "var(--edge-sticky)", "💓", "Heartbeat", "the container touches a heartbeat file on every model event — the host watches it")}${n101Arrow}
+        ${n101Step(4, "var(--edge-pattern)", "🤖", "Agent works", "reads, thinks, runs tools — long turns are normal (hard ceiling ≈ 30 min)")}${n101Arrow}
+        ${n101Step(5, "var(--edge-mention)", "📤", "Reply written", "into <code>outbound.db</code> — the only door out of the container")}${n101Arrow}
+        ${n101Step(6, "var(--edge-a2a)", "✅", "Host delivers", "polls the mailbox, sends via the channel adapter; after idle the container naps")}
+      </div>
+    </div>
+    <div class="sect">
+      <h3>${ico("alert")}"It's not replying" — what the symptoms mean</h3>
+      <div class="modes">
+        ${n101Mode("var(--warn)", "Reply exists… in the wrong chat", "The outbound row shows an unexpected target — the agent used an ambiguous destination name. The reply went somewhere real, just not here.")}
+        ${n101Mode("var(--err)", "Inbound completed, outbound silent", "The agent replied to a destination that no longer exists (block dropped), or a task-mode turn ate an inline reply. Restarting the group refreshes its view.")}
+        ${n101Mode("var(--err)", "Pending + heartbeat gone stale", "Heartbeat older than ~60s with work pending = the container died or wedged. The host kills and respawns it automatically.")}
+        ${n101Mode("var(--warn)", "No heartbeat file at all", "The agent never produced its first event — stuck during startup (tool-server init or I/O), not a slow answer.")}
+        ${n101Mode("var(--ok)", "\"napping\" is not a problem", "Containers exit after idle by design. The next message wakes them with full history.")}
+      </div>
+      <details><summary>Nerd corner</summary><ul>
+        <li>Rows with <code>kind=task</code> resting at <i>pending</i> with a future date are <b>armed schedules</b>, not stuck messages.</li>
+        <li>Container logs vanish when the container exits — if an agent failed silently, the session DBs are the surviving evidence.</li>
+      </ul></details>
+    </div>`;
+}
+
+function explainTasks() {
+  return `
+    <div class="sect">
+      <h3>${ico("zap")}When does it fire — and where does the answer go?</h3>
+      <div class="flow">
+        ${n101Step(1, "var(--acc)", "🗓", "You schedule it", "one-shot (“at 9am tomorrow”) or recurring (cron)")}${n101Arrow}
+        ${n101Step(2, "var(--edge-sticky)", "🕐", "The group's clock", "cron is read in the agent group's timezone (config → Timezone), else the install default")}${n101Arrow}
+        ${n101Step(3, "var(--edge-pattern)", "🤖", "Fires in task mode", "wakes the agent like a message would — but the turn runs as a task, not a chat")}${n101Arrow}
+        ${n101Step(4, "var(--edge-mention)", "📋", "Output → run log", "the task's result is logged on the series — it does NOT auto-appear in any chat")}${n101Arrow}
+        ${n101Step(5, "var(--edge-a2a)", "📮", "Chat only if asked", "the task prompt must explicitly send a message for anything to land in a chat")}
+      </div>
+      <div class="modes" style="margin-top:10px">
+        ${n101Mode("var(--warn)", "Task mode ≠ chat mode", "In a task turn, inline replies are inert by design — only explicit sends deliver. If a task should message you, its prompt must say so.")}
+        ${n101Mode("var(--acc)", "One-shot vs recurring", "One-shot tasks run once at their time and complete. Recurring tasks compute the next fire from their cron after every run — pause stops the clock, resume restarts it.")}
+        ${n101Mode("var(--edge-sticky)", "Timezone gotcha", "Change the group's timezone and its cron schedules re-ground immediately — \"9am\" means 9am in the NEW zone.")}
+      </div>
+    </div>`;
+}
+
+function explainApprovals() {
+  return `
+    <div class="sect">
+      <h3>${ico("shield")}Who said yes? — the approval pipeline</h3>
+      <div class="flow">
+        ${n101Step(1, "var(--acc)", "🙋", "Agent asks", "for something privileged: install packages, wire a tool server, use a gated credential")}${n101Arrow}
+        ${n101Step(2, "var(--warn)", "Guard holds it", "every privileged action passes a guard: allow · hold-for-approval · deny")}${n101Arrow}
+        ${n101Step(3, "var(--edge-sticky)", "🎯", "Approver picked", "admins scoped to that agent first, then global admins, then owners")}${n101Arrow}
+        ${n101Step(4, "var(--edge-mention)", "💳", "Card lands in their DM", "an approval card with the request, its reason, and approve/reject choices")}${n101Arrow}
+        ${n101Step(5, "var(--edge-a2a)", "⚖️", "Decision replayed", "approve → the action re-runs carrying the approval as a grant · reject → the agent is told no")}
+      </div>
+      <div class="modes" style="margin-top:10px">
+        ${n101Mode("var(--err)", "Stuck at pending forever?", "Either nobody answered the card, or the approval listener on the host isn't running — the request waits until the gateway times out.")}
+        ${n101Mode("var(--acc)", "Where do cards go?", "To the picked approver's DM on their channel — not to the chat that triggered the request.")}
+      </div>
+    </div>`;
+}
+
+function explainRoles() {
+  const y = `<span style="color:var(--ok)">✓</span>`, n = `<span style="color:var(--muted)">—</span>`;
+  return `
+    <div class="sect">
+      <h3>${ico("users")}Who can do what</h3>
+      <p class="lead">Privilege belongs to <b>users</b> (platform identities), not to agents. Roles can be global or scoped to one agent group.</p>
+      <div style="overflow-x:auto"><table class="kv" style="min-width:480px">
+        <tr><td></td><td><b>Talk to the agent</b></td><td><b>Approve its requests</b></td><td><b>Manage the fleet</b></td></tr>
+        <tr><td>👑 owner</td><td>${y}</td><td>${y} any agent</td><td>${y} everything</td></tr>
+        <tr><td>🛡 admin (global)</td><td>${y}</td><td>${y} any agent</td><td>${y} admin commands</td></tr>
+        <tr><td>🎫 admin (scoped)</td><td>${y}</td><td>${y} that agent only</td><td>${n}</td></tr>
+        <tr><td>👤 member</td><td>${y} (access gate)</td><td>${n}</td><td>${n}</td></tr>
+      </table></div>
+      <details><summary>Where each lives</summary><ul>
+        <li><b>Roles</b> (this screen) = owner/admin grants. <b>Members</b> = the unprivileged access gate per agent group.</li>
+        <li>Strangers are a per-chat setting instead — see <a href="#" onclick="nav101('n101-doors');return false">the three doors in NanoClaw 101</a>.</li>
+      </ul></details>
+    </div>`;
+}
+
+function explainIsolation() {
+  return `
+    <div class="sect" style="border:0;padding:0;background:transparent">
+      <div class="modes">
+        ${n101Mode("var(--edge-pattern)", "🧠 One brain for everything", "<b>agent-shared</b> session mode: this agent holds ONE conversation across all its chats — it sees your DM and your group as one stream. Pick when every chat is you.")}
+        ${n101Mode("var(--edge-mention)", "🚪 One brain, separate rooms", "<b>shared</b> session mode (default): one agent, but each chat is its own conversation. Same assistant, different audiences — nothing crosses over in-context.")}
+        ${n101Mode("var(--edge-sticky)", "👥 Different brains entirely", "Separate <b>agent groups</b>: for different people or trust levels, don't reuse this agent — create another agent group and wire that instead. Hard isolation: separate memory, files, container.")}
+      </div>
+    </div>`;
+}
+
+function explainConfig() {
+  return `
+    <div class="modes">
+      ${n101Mode("var(--muted)", "🚫 cli_scope: disabled", "The agent never learns the admin CLI exists. Zero self-management.")}
+      ${n101Mode("var(--acc)", "🎫 cli_scope: group (default)", "Can manage itself only — its own tasks, members, destinations, sessions. Cross-agent access is refused.")}
+      ${n101Mode("var(--warn)", "🗝 cli_scope: global", "Full fleet admin from inside the container. Owner agents only — treat like root.")}
+    </div>
+    <div class="modes" style="margin-top:8px">
+      ${n101Mode("var(--edge-mention)", "🔄 Restart", "New container, same image. Enough for scalar config changes (model, timezone, assistant name…).")}
+      ${n101Mode("var(--edge-sticky)", "🏗 Restart --rebuild", "Rebuilds the Docker image first, then restarts. Needed after package (apt/npm) changes — takes minutes.")}
+    </div>`;
 }
 
 /* ================================ chat =============================== */
