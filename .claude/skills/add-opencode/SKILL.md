@@ -73,6 +73,16 @@ the same exact version:
 opencode-cli-tools.test.ts -> src/opencode-cli-tools.test.ts
 ```
 
+## Spark registration provisioning overlay
+
+The Spark appliance extends the host contribution with per-group provider
+settings created by its Mattermost registration wizard. Apply this maintained
+overlay after refreshing the standard provider payload:
+
+```nc:copy
+payload/src/providers/opencode.ts -> src/providers/opencode.ts
+```
+
 ### 5. Build and validate
 
 ```nc:run effect:build
@@ -227,13 +237,3 @@ send a message. A clean exchange returns the model's reply with no `Unknown
 provider: opencode` error and no UUID/session warnings in the logs.
 
 To remove this provider, see [REMOVE.md](REMOVE.md).
-
-## Spark registration provisioning overlay
-
-The Spark appliance extends the host contribution with per-group provider
-settings created by its Mattermost registration wizard. Apply this maintained
-overlay after refreshing the standard provider payload:
-
-```nc:copy
-payload/src/providers/opencode.ts -> src/providers/opencode.ts
-```
