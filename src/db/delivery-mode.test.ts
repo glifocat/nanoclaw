@@ -39,6 +39,7 @@ function baseRow(deliveryMode: string | null): ContainerConfigRow {
     additional_mounts: '[]',
     cli_scope: 'group',
     delivery_mode: deliveryMode,
+    timezone: null,
     updated_at: GROUP.created_at,
   };
 }
