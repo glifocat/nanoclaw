@@ -6,13 +6,19 @@ description: Preserve and install the Spark appliance Mattermost Chat SDK channe
 # Mattermost channel for the Spark appliance
 
 Install the appliance's first-party Mattermost channel module. The external
-`chat-adapter-mattermost` package remains pinned to the locally preserved 0.0.5
-tarball in `package.json`; verify that tarball exists before building.
+`chat-adapter-mattermost` package is pinned to a vendored 0.0.5 tarball so both
+isolated update worktrees and the live checkout resolve the same artifact.
 
-Copy the maintained channel module into the host tree:
+Copy the maintained channel module and adapter artifact into the host tree:
 
 ```nc:copy
 payload/src/channels/mattermost.ts -> src/channels/mattermost.ts
+payload/vendor/chat-adapter-mattermost-0.0.5.tgz -> vendor/chat-adapter-mattermost-0.0.5.tgz
+```
+
+```nc:run effect:fetch
+pnpm pkg set 'dependencies.chat-adapter-mattermost=file:vendor/chat-adapter-mattermost-0.0.5.tgz'
+pnpm install --lockfile-only --no-frozen-lockfile
 ```
 
 Register the default Mattermost instance:
@@ -21,8 +27,8 @@ Register the default Mattermost instance:
 import './mattermost.js';
 ```
 
-Verify the local adapter artifact:
+Verify the vendored adapter artifact:
 
 ```nc:run effect:check
-test -f /home/nanoco/mattermost-lab/chat-adapter-mattermost-0.0.5.tgz
+test -f vendor/chat-adapter-mattermost-0.0.5.tgz
 ```
