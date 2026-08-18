@@ -11,7 +11,18 @@
 import fs from 'fs';
 import path from 'path';
 
+import { readEnvFile } from '../env.js';
 import { registerProviderContainerConfig } from './provider-container-registry.js';
+
+const PASSTHROUGH_KEYS = [
+  'OPENCODE_PROVIDER',
+  'OPENCODE_MODEL',
+  'OPENCODE_SMALL_MODEL',
+  'ANTHROPIC_BASE_URL',
+  'OPENCODE_MODEL_CONTEXT_LIMIT',
+  'OPENCODE_MODEL_OUTPUT_LIMIT',
+  'OPENCODE_MODEL_INPUT_MODALITIES',
+] as const;
 
 function mergeNoProxy(current: string | undefined, additions: string): string {
   if (!current?.trim()) return additions;
@@ -37,47 +48,15 @@ registerProviderContainerConfig('opencode', (ctx) => {
     NO_PROXY: mergeNoProxy(ctx.hostEnv.NO_PROXY, '127.0.0.1,localhost'),
     no_proxy: mergeNoProxy(ctx.hostEnv.no_proxy, '127.0.0.1,localhost'),
   };
-  for (const key of [
-    'OPENCODE_PROVIDER',
-    'OPENCODE_MODEL',
-    'OPENCODE_SMALL_MODEL',
-    'ANTHROPIC_BASE_URL',
-    'OPENCODE_MODEL_CONTEXT_LIMIT',
-    'OPENCODE_MODEL_OUTPUT_LIMIT',
-    'OPENCODE_MODEL_INPUT_MODALITIES',
-  ] as const) {
-    const value = ctx.hostEnv[key];
+  // The host process does not load `.env` into process.env (readEnvFile keeps
+  // file values out of child processes), and the service units set no
+  // EnvironmentFile — so under launchd/systemd, ctx.hostEnv carries none of
+  // these. Fall back to the `.env` file the way the claude provider does;
+  // a real exported variable still wins over the file.
+  const dotenv = readEnvFile([...PASSTHROUGH_KEYS]);
+  for (const key of PASSTHROUGH_KEYS) {
+    const value = ctx.hostEnv[key] ?? dotenv[key];
     if (value) env[key] = value;
-  }
-
-  // Per-group overrides (G1, 2026-07-25). Precedence: provider-env.json >
-  // container.json `model` > service hostEnv. Both files live in the group dir;
-  // absence or parse failure falls back to the service-wide values so a broken
-  // file can never stop a spawn.
-  const readJson = (file: string): Record<string, unknown> | undefined => {
-    try {
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch {
-      return undefined;
-    }
-  };
-  const groupConfig = readJson(path.join(ctx.groupDir, 'container.json'));
-  if (typeof groupConfig?.model === 'string' && groupConfig.model) {
-    env.OPENCODE_MODEL = groupConfig.model;
-  }
-  const GROUP_ENV_ALLOWLIST = [
-    'OPENCODE_MODEL',
-    'OPENCODE_SMALL_MODEL',
-    'ANTHROPIC_BASE_URL',
-    'OPENCODE_MODEL_CONTEXT_LIMIT',
-    'OPENCODE_MODEL_OUTPUT_LIMIT',
-    'OPENCODE_MODEL_INPUT_MODALITIES',
-  ];
-  const groupEnv = readJson(path.join(ctx.groupDir, 'provider-env.json'));
-  for (const [key, value] of Object.entries(groupEnv ?? {})) {
-    if (GROUP_ENV_ALLOWLIST.includes(key) && typeof value === 'string') {
-      env[key] = value;
-    }
   }
 
   return {
