@@ -50,9 +50,9 @@ OpenClaw and NanoClaw v2 differ structurally. Keep these in mind throughout:
 - **Access control.** Per messaging group `unknown_sender_policy` plus
   `user_roles` (owner/admin) and `agent_group_members` — not a JSON allowlist
   file.
-- **Scheduled tasks.** A task is a `messages_in` row (`kind='task'`) in a
-  session's `inbound.db`, carrying a cron `recurrence` and a `process_after`
-  timestamp. The agent creates them via its `schedule_task` MCP tool.
+- **Scheduled tasks.** A task is managed through `ncl tasks` and runs in an
+  isolated system session for its agent group. The agent creates one with
+  `ncl tasks create`; every delivery from a task must name its destination.
 
 ## Migration State File
 
@@ -414,8 +414,8 @@ Read `<STATE_DIR>/cron/jobs.json`. If absent or empty, skip.
 
 If jobs exist, read `${CLAUDE_SKILL_DIR}/MIGRATE_CRONS.md` for the v2 task
 model, the `mapCronToRecurrence` transform, the full field mapping, and how
-tasks are created (the agent's `schedule_task` MCP tool, since tasks live in a
-per-session `inbound.db` the host owns). Follow it for each enabled job.
+tasks are created with `ncl tasks create` in an isolated task session. Follow
+it for each enabled job.
 
 ## Phase 6: MCP, Webhooks, Other Config
 

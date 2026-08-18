@@ -19,12 +19,10 @@ The host recurrence sweep (`src/modules/scheduling/recurrence.ts`, called each
 timezone** (`TIMEZONE` from `src/config.ts`), and clones a fresh pending row
 forward. One-shot tasks are marked `completed` after running, never deleted.
 
-Because `inbound.db` is host-owned and per-session, you do **not** write task
-rows by hand. The supported path is to let the running agent create them
-through its `schedule_task` MCP tool — the agent writes a system message, the
-host's `schedule_task` delivery action (`src/modules/scheduling/actions.ts`)
-inserts the `messages_in` row. So migrating crons means **handing the agent a
-clear instruction per job and letting it call `schedule_task`**.
+Because task state is host-owned, you do **not** write task rows by hand. The
+supported path is `ncl tasks create`, which provisions an isolated system
+session for the task series. So migrating crons means handing the agent a clear
+instruction per job and letting it run the task CLI.
 
 ## OpenClaw Cron Job Format
 
@@ -91,21 +89,21 @@ OpenClaw `schedule` into the v2 `{ processAfter, recurrence, notes }` shape:
 
 ## Creating the task
 
-Tasks are created **by the agent** via its `schedule_task` MCP tool, which is
-why the agent group and its DM/group session must already exist (Phase 1) and
-the service must be running. Hand the agent one instruction per kept job, e.g.:
+Tasks are created **by the agent** via `ncl tasks create`; the agent group must
+already exist (Phase 1) and the service must be running. Hand the agent one
+instruction per kept job, e.g.:
 
 > Schedule a recurring task: prompt = "Summarize my unread email and send me
 > the digest.", recurrence = "0 9 * * 1-5", first run = "2026-06-09T09:00:00"
 > (my local time).
 
-The agent calls `schedule_task` with `prompt`, `processAfter` (ISO; a naive
-local timestamp is interpreted in the user's timezone), `recurrence` (the cron
-expression, or omitted for one-shot), and an optional `script`. The host
-inserts the `messages_in` row and the recurrence sweep takes over.
+The agent runs `ncl tasks create --name <name> --prompt <prompt>` with
+`--process-after` (ISO or natural time; a naive local timestamp uses the group
+timezone), `--recurrence` (cron, omitted for one-shot), and optional `--script`.
+The host creates the isolated task session and the recurrence sweep takes over.
 
-To confirm afterwards, ask the agent to run `list_tasks`, or inspect the
-session's inbound DB directly:
+To confirm afterwards, ask the agent to run `ncl tasks list`, or inspect the
+task session's inbound DB directly:
 
 ```bash
 pnpm exec tsx scripts/q.ts \

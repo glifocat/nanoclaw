@@ -84,7 +84,7 @@ AskUserQuestion: "Want periodic wiki health checks?"
 2. **Monthly**
 3. **Skip** — lint manually
 
-If yes, ask the agent to schedule the lint task using the `schedule_task` MCP tool in conversation.
+If yes, ask the agent to schedule the lint task with `ncl tasks create` in conversation; the task prompt must explicitly name any delivery destination.
 
 ## Step 6: Restart
 
