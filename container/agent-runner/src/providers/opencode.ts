@@ -38,6 +38,25 @@ const SESSION_STATUS_RETRY_ERROR_AFTER = 3;
 const STALE_SESSION_RE =
   /no conversation found|ENOENT.*\.jsonl|session.*not found|NotFoundError|connection reset|ECONNRESET|404|event timeout/i;
 
+
+/**
+ * Codex `startOrResumeCodexThread` starts a fresh thread when `thread/resume`
+ * reports the id gone. OpenCode's equivalent failure is quieter: a poisoned
+ * session accepts `promptAsync`, emits `session.idle` at step 0 with no
+ * assistant work, and the runner treats that as a finished turn. Only a
+ * *resume* that produced no assistant work should fall back, and only once
+ * per query — a brand-new session that stays dry is a model/tools miss, not
+ * a dead continuation.
+ */
+export function isEmptyOpenCodeResume(opts: {
+  resumedExistingSession: boolean;
+  alreadyFellBack: boolean;
+  sawAssistantWork: boolean;
+}): boolean {
+  return opts.resumedExistingSession && !opts.alreadyFellBack && !opts.sawAssistantWork;
+}
+
+
 function killProcessTree(proc: ChildProcess): void {
   if (!proc.pid) return;
   try {
@@ -712,6 +731,7 @@ export class OpenCodeProvider implements AgentProvider {
 
     const self = this;
     const IDLE_TIMEOUT_MS = Number(process.env.OPENCODE_IDLE_TIMEOUT_MS) || 300_000;
+    let emptyResumeFellBack = false;
 
     async function* gen(): AsyncGenerator<ProviderEvent> {
       let initYielded = false;
@@ -731,6 +751,7 @@ export class OpenCodeProvider implements AgentProvider {
 
         const { text, attachments } = pending.shift()!;
         let sessionId = self.activeSessionId;
+        const resumedExistingSession = Boolean(sessionId);
 
         if (!sessionId) {
           const created = await client.session.create();
@@ -747,145 +768,190 @@ export class OpenCodeProvider implements AgentProvider {
           initYielded = true;
         }
 
-        const promptRes = await client.session.promptAsync({
-          path: { id: sessionId },
-          body: { parts: buildPromptParts(text, attachments) },
-        });
-        if (promptRes.error) {
-          self.activeSessionId = undefined;
-          throw new Error(`OpenCode promptAsync: ${JSON.stringify(promptRes.error)}`);
-        }
-
-        const partTextByMessageId = new Map<string, string>();
-        const roleByMessageId = new Map<string, string>();
-        let lastEventAt = Date.now();
-        let eventTimedOut = false;
-        const timeoutCheck = setInterval(() => {
-          if (Date.now() - lastEventAt > IDLE_TIMEOUT_MS) {
-            log(`OpenCode event timeout (${IDLE_TIMEOUT_MS}ms) — clearing session ${sessionId}`);
-            eventTimedOut = true;
+        async function* runTurn(
+          turnSessionId: string,
+          turnText: string,
+          turnAttachments: typeof attachments,
+        ): AsyncGenerator<ProviderEvent, { resultText: string; sawAssistantWork: boolean }> {
+          const promptRes = await client.session.promptAsync({
+            path: { id: turnSessionId },
+            body: { parts: buildPromptParts(turnText, turnAttachments) },
+          });
+          if (promptRes.error) {
             self.activeSessionId = undefined;
-            destroySharedRuntime();
-            kick();
+            throw new Error(`OpenCode promptAsync: ${JSON.stringify(promptRes.error)}`);
           }
-        }, 5000);
 
-        try {
-          turn: while (true) {
-            if (aborted) return;
-            if (eventTimedOut) {
-              throw new Error(`OpenCode event timeout (${IDLE_TIMEOUT_MS}ms)`);
+          const partTextByMessageId = new Map<string, string>();
+          const roleByMessageId = new Map<string, string>();
+          const partMessageIds = new Set<string>();
+          let sawAssistantWork = false;
+          let lastEventAt = Date.now();
+          let eventTimedOut = false;
+          const timeoutCheck = setInterval(() => {
+            if (Date.now() - lastEventAt > IDLE_TIMEOUT_MS) {
+              log(`OpenCode event timeout (${IDLE_TIMEOUT_MS}ms) — clearing session ${turnSessionId}`);
+              eventTimedOut = true;
+              self.activeSessionId = undefined;
+              destroySharedRuntime();
+              kick();
             }
+          }, 5000);
 
-            const { value: ev, done } = await stream.next();
-            if (done) {
-              throw new Error('OpenCode SSE stream ended unexpectedly');
-            }
-
-            if (!ev?.type || ev.type === 'server.connected' || ev.type === 'server.heartbeat') continue;
-
-            lastEventAt = Date.now();
-            yield { type: 'activity' };
-
-            switch (ev.type) {
-              case 'message.updated': {
-                const info = ev.properties.info as { id?: string; role?: string } | undefined;
-                if (info?.id && info?.role) {
-                  roleByMessageId.set(info.id, info.role);
-                }
-                break;
+          try {
+            turn: while (true) {
+              if (aborted) return { resultText: '', sawAssistantWork };
+              if (eventTimedOut) {
+                throw new Error(`OpenCode event timeout (${IDLE_TIMEOUT_MS}ms)`);
               }
-              case 'message.part.updated': {
-                const part = ev.properties.part as { type?: string; messageID?: string; text?: string } | undefined;
-                if (part?.type === 'text' && part.messageID && part.text) {
-                  partTextByMessageId.set(part.messageID, part.text);
-                }
-                break;
+
+              const { value: ev, done } = await stream.next();
+              if (done) {
+                throw new Error('OpenCode SSE stream ended unexpectedly');
               }
-              case 'permission.updated': {
-                const perm = ev.properties as { id?: string; sessionID?: string };
-                if (perm.sessionID === sessionId && perm.id) {
-                  try {
-                    await client.postSessionIdPermissionsPermissionId({
-                      path: { id: sessionId, permissionID: perm.id },
-                      body: { response: 'always' },
-                    });
-                  } catch (err) {
-                    log(`Failed to auto-reply permission: ${err instanceof Error ? err.message : String(err)}`);
+
+              if (!ev?.type || ev.type === 'server.connected' || ev.type === 'server.heartbeat') continue;
+
+              lastEventAt = Date.now();
+              yield { type: 'activity' };
+
+              switch (ev.type) {
+                case 'message.updated': {
+                  const info = ev.properties.info as { id?: string; role?: string } | undefined;
+                  if (info?.id && info?.role) {
+                    roleByMessageId.set(info.id, info.role);
+                    if (info.role === 'assistant' && partMessageIds.has(info.id)) {
+                      sawAssistantWork = true;
+                    }
                   }
+                  break;
                 }
-                break;
-              }
-              case 'question.asked': {
-                // The `question: 'deny'` config above should stop this tool
-                // from ever firing, but this is the real fix for the wedge:
-                // whatever raises this event, answer it immediately so the
-                // single shared OpenCode server can never block on it — a
-                // config regression or an OpenCode-side path that raises the
-                // event before consulting permission should not be able to
-                // freeze every subsequent turn again.
-                const req = ev.properties as { id?: string; sessionID?: string; questions?: unknown[] };
-                if (req.sessionID === undefined || req.sessionID === sessionId) {
-                  await autoAnswerQuestion(questionClient, req);
+                case 'message.part.updated': {
+                  const part = ev.properties.part as { type?: string; messageID?: string; text?: string } | undefined;
+                  if (part?.messageID) {
+                    partMessageIds.add(part.messageID);
+                    if (part.type === 'text' && part.text) {
+                      partTextByMessageId.set(part.messageID, part.text);
+                    }
+                    const role = roleByMessageId.get(part.messageID);
+                    if (role === 'assistant' || (part.type && part.type !== 'text')) {
+                      sawAssistantWork = true;
+                    }
+                  }
+                  break;
                 }
-                break;
-              }
-              case 'session.status': {
-                const props = ev.properties as {
-                  sessionID?: string;
-                  status?: { type?: string; attempt?: number; message?: string };
-                };
-                if (props.sessionID !== sessionId) break;
-                const st = props.status;
-                if (
-                  st?.type === 'retry' &&
-                  typeof st.attempt === 'number' &&
-                  st.attempt >= SESSION_STATUS_RETRY_ERROR_AFTER &&
-                  st.message
-                ) {
-                  self.activeSessionId = undefined;
-                  throw new Error(`OpenCode retry limit (${st.attempt}): ${st.message}`);
+                case 'permission.updated': {
+                  const perm = ev.properties as { id?: string; sessionID?: string };
+                  if (perm.sessionID === turnSessionId && perm.id) {
+                    sawAssistantWork = true;
+                    try {
+                      await client.postSessionIdPermissionsPermissionId({
+                        path: { id: turnSessionId, permissionID: perm.id },
+                        body: { response: 'always' },
+                      });
+                    } catch (err) {
+                      log(`Failed to auto-reply permission: ${err instanceof Error ? err.message : String(err)}`);
+                    }
+                  }
+                  break;
                 }
-                break;
-              }
-              case 'session.error': {
-                const props = ev.properties as { sessionID?: string; error?: unknown };
-                if (props.sessionID === sessionId || props.sessionID === undefined) {
-                  self.activeSessionId = undefined;
-                  throw new Error(sessionErrorMessage(props));
+                case 'question.asked': {
+                  // The `question: 'deny'` config above should stop this tool
+                  // from ever firing, but this is the real fix for the wedge:
+                  // whatever raises this event, answer it immediately so the
+                  // single shared OpenCode server can never block on it — a
+                  // config regression or an OpenCode-side path that raises the
+                  // event before consulting permission should not be able to
+                  // freeze every subsequent turn again.
+                  const req = ev.properties as { id?: string; sessionID?: string; questions?: unknown[] };
+                  if (req.sessionID === undefined || req.sessionID === turnSessionId) {
+                    await autoAnswerQuestion(questionClient, req);
+                  }
+                  break;
                 }
-                break;
-              }
-              case 'session.compacted': {
-                // The active session was just auto-compacted; arm the routing
-                // reminder for the next prompt. Filter by sessionID like the
-                // other cases — the shared server emits this for every session.
-                const sid = (ev.properties as { sessionID?: string }).sessionID;
-                compaction.note(sid, sessionId);
-                break;
-              }
-              case 'session.idle': {
-                const sid = (ev.properties as { sessionID?: string }).sessionID;
-                if (sid === sessionId) {
-                  break turn;
+                case 'session.status': {
+                  const props = ev.properties as {
+                    sessionID?: string;
+                    status?: { type?: string; attempt?: number; message?: string };
+                  };
+                  if (props.sessionID !== turnSessionId) break;
+                  const st = props.status;
+                  if (
+                    st?.type === 'retry' &&
+                    typeof st.attempt === 'number' &&
+                    st.attempt >= SESSION_STATUS_RETRY_ERROR_AFTER &&
+                    st.message
+                  ) {
+                    self.activeSessionId = undefined;
+                    throw new Error(`OpenCode retry limit (${st.attempt}): ${st.message}`);
+                  }
+                  break;
                 }
-                break;
+                case 'session.error': {
+                  const props = ev.properties as { sessionID?: string; error?: unknown };
+                  if (props.sessionID === turnSessionId || props.sessionID === undefined) {
+                    self.activeSessionId = undefined;
+                    throw new Error(sessionErrorMessage(props));
+                  }
+                  break;
+                }
+                case 'session.compacted': {
+                  const sid = (ev.properties as { sessionID?: string }).sessionID;
+                  compaction.note(sid, turnSessionId);
+                  break;
+                }
+                case 'session.idle': {
+                  const sid = (ev.properties as { sessionID?: string }).sessionID;
+                  if (sid === turnSessionId) {
+                    break turn;
+                  }
+                  break;
+                }
+                default:
+                  break;
               }
-              default:
-                break;
+            }
+          } finally {
+            clearInterval(timeoutCheck);
+          }
+
+          let resultText = '';
+          for (const [msgId, role] of roleByMessageId) {
+            if (role === 'assistant') {
+              sawAssistantWork = true;
+              resultText = partTextByMessageId.get(msgId) ?? resultText;
             }
           }
-        } finally {
-          clearInterval(timeoutCheck);
+          return { resultText, sawAssistantWork };
         }
 
-        let resultText = '';
-        for (const [msgId, role] of roleByMessageId) {
-          if (role === 'assistant') {
-            resultText = partTextByMessageId.get(msgId) ?? resultText;
+        let outcome = yield* runTurn(sessionId, text, attachments);
+
+        if (
+          isEmptyOpenCodeResume({
+            resumedExistingSession,
+            alreadyFellBack: emptyResumeFellBack,
+            sawAssistantWork: outcome.sawAssistantWork,
+          })
+        ) {
+          log(`Empty resume on ${sessionId}; starting fresh session.`);
+          emptyResumeFellBack = true;
+          const created = await client.session.create();
+          if (created.error) {
+            throw new Error(`OpenCode: failed to create session: ${JSON.stringify(created.error)}`);
           }
+          const freshId = created.data?.id;
+          if (!freshId) throw new Error('OpenCode: failed to create session (no id)');
+          sessionId = freshId;
+          self.activeSessionId = freshId;
+          yield { type: 'init', continuation: freshId };
+          initYielded = true;
+          const memory = runMemorySessionHook(self.memorySessionHook, 'startup');
+          const retryText = memory ? wrapPromptWithContext(text, memory) : text;
+          outcome = yield* runTurn(freshId, retryText, attachments);
         }
-        yield { type: 'result', text: resultText || null };
+
+        yield { type: 'result', text: outcome.resultText || null };
       }
     }
 
