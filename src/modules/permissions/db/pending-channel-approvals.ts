@@ -44,6 +44,7 @@ export function createPendingChannelApproval(
     | 'approver_user_id'
     | 'created_at'
     | 'title'
+    | 'question'
     | 'options_json'
   >,
 ): void {

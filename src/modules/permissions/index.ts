@@ -360,7 +360,7 @@ async function deliverRegistrationQuestion(
     return false;
   }
   const options = normalizeOptions(rawOptions);
-  updatePendingChannelApprovalCard(row.messaging_group_id, title, JSON.stringify(options));
+  updatePendingChannelApprovalCard(row.messaging_group_id, title, question, JSON.stringify(options));
   try {
     await adapter.deliver(
       approverDm.channel_type,
