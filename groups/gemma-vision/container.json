@@ -11,5 +11,15 @@
   "assistantName": "Gemma Vision",
   "agentGroupId": "ag-bc5ed1d7-17ea-43a5-a4ab-79045d252d61",
   "model": "openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic",
-  "providerSettings": {}
+  "providerSettings": {
+    "opencode": {
+      "modelProvider": "openai",
+      "baseUrl": "http://172.17.0.1:8010/v1",
+      "smallModel": "openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic",
+      "contextLimit": 65536,
+      "outputLimit": 8192,
+      "inputModalities": "text,image"
+    }
+  },
+  "deliveryMode": "tools-only"
 }

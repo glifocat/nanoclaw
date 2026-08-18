@@ -27,5 +27,14 @@
   "agentGroupId": "ag-6e9d6f1b-77e1-4cbf-b86c-e9fd062a2c19",
   "model": "openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic",
   "deliveryMode": "tools-only",
-  "providerSettings": {}
+  "providerSettings": {
+    "opencode": {
+      "modelProvider": "openai",
+      "baseUrl": "http://172.17.0.1:8010/v1",
+      "smallModel": "openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic",
+      "contextLimit": 65536,
+      "outputLimit": 8192,
+      "inputModalities": "text,image"
+    }
+  }
 }
