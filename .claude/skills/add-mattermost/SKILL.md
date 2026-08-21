@@ -5,10 +5,17 @@ description: Add Mattermost channel integration via Chat SDK.
 
 # Add Mattermost Channel
 
-Adds Mattermost support via the Chat SDK bridge, wrapping the community
-[`chat-adapter-mattermost`](https://github.com/thiagoferolla/chat-adapter-mattermost)
-package. Events arrive over an outbound WebSocket (`/api/v4/websocket`) — no
-public URL or webhook is needed for basic messaging.
+Adds Mattermost support via the Chat SDK bridge, wrapping
+[`@nanoco/chat-adapter-mattermost`](https://github.com/nanocoai/chat-adapter-mattermost).
+Events arrive over an outbound WebSocket (`/api/v4/websocket`) — no public URL
+or webhook is needed for basic messaging. Interactive cards (approvals,
+`ask_question` buttons and selects) work too, once Mattermost can reach
+NanoClaw's webhook server (see **Interactive cards** below).
+
+> Not the unscoped `chat-adapter-mattermost` package on npm. That is an
+> unrelated codebase with a different thread-id encoding; it cannot deliver
+> replies through the bridge and its card buttons are dead. If a previous
+> install pinned it, see **Migrating from `chat-adapter-mattermost@1.1.3`**.
 
 ## Install
 
@@ -21,7 +28,7 @@ Skip to **Credentials** if all of these are already in place:
 
 - `src/channels/mattermost.ts` exists
 - `src/channels/index.ts` contains `import './mattermost.js';`
-- `chat-adapter-mattermost` is listed in `package.json` dependencies
+- `@nanoco/chat-adapter-mattermost` is listed in `package.json` dependencies
 
 Otherwise continue. Every step below is safe to re-run.
 
@@ -36,7 +43,12 @@ git fetch origin channels
 ```bash
 git show origin/channels:src/channels/mattermost.ts > src/channels/mattermost.ts
 git show origin/channels:src/channels/mattermost-registration.test.ts > src/channels/mattermost-registration.test.ts
+git show origin/channels:src/channels/mattermost-live.test.ts > src/channels/mattermost-live.test.ts
 ```
+
+`mattermost-live.test.ts` is a round-trip suite against a real server. It
+skips when no `MATTERMOST_LAB_*` env is present, so it costs nothing in a
+normal `vitest run`; VERIFY.md explains how to point it at a server.
 
 ### 3. Append the self-registration import
 
@@ -48,12 +60,8 @@ import './mattermost.js';
 
 ### 4. Install the adapter package (pinned)
 
-`chat-adapter-mattermost` is an unscoped, community-maintained package (one
-individual maintainer, a handful of releases) — a materially higher risk tier
-than the official `@chat-adapter/*` packages, so pin it exactly:
-
 ```bash
-pnpm install chat-adapter-mattermost@1.1.3
+pnpm install @nanoco/chat-adapter-mattermost@0.1.0
 ```
 
 ### 5. Build and validate
@@ -65,9 +73,9 @@ pnpm exec vitest run src/channels/mattermost-registration.test.ts
 
 `mattermost-registration.test.ts` imports the real channel barrel and asserts
 the registry contains `mattermost`. It goes red if the import line is deleted
-or drifts, or if `chat-adapter-mattermost` isn't installed (the import
-throws). End-to-end delivery against a real server is verified manually once
-the service runs.
+or drifts, or if `@nanoco/chat-adapter-mattermost` isn't installed (the import
+throws). End-to-end delivery is covered by `pnpm run test:mattermost-live`
+against a server you control (VERIFY.md), or manually once the service runs.
 
 ## Credentials
 
@@ -98,9 +106,35 @@ from the same screen if you want it revoked.
 ```bash
 MATTERMOST_BASE_URL=https://mattermost.example.com
 MATTERMOST_BOT_TOKEN=your-bot-access-token
+# optional — needed for clickable cards (buttons, selects, approvals):
+MATTERMOST_CALLBACK_URL=https://nanoclaw.example.com
+MATTERMOST_CALLBACK_SECRET=$(openssl rand -hex 24)
 ```
 
 `MATTERMOST_BASE_URL` must include the scheme and no trailing slash.
+
+### Interactive cards
+
+Mattermost delivers button clicks by POSTing to a URL the bot supplies with
+the card. Set `MATTERMOST_CALLBACK_URL` to an address **the Mattermost server
+can reach** for NanoClaw's webhook server (port 3000 by default) — either the
+base URL (the adapter appends `/webhook/mattermost`) or the full route. Without
+it, cards still render, but as plain markdown with no buttons.
+
+Set `MATTERMOST_CALLBACK_SECRET` as well. Mattermost does not sign action
+callbacks; the adapter embeds this secret in every button's server-only context
+and the webhook refuses with `401` any click that does not present it, so
+learning the URL is not enough to forge an approval. Cards posted before the
+secret was set stop being clickable — re-issue them.
+
+If the server runs in Docker on the same host, `MATTERMOST_CALLBACK_URL` is
+typically `http://host.docker.internal:3000`, and the server must list that
+host under **System Console → Environment → Developer → Allow untrusted
+internal connections** (`ServiceSettings.AllowedUntrustedInternalConnections`).
+Private-network callback targets are refused otherwise — silently, from the
+clicker's point of view. VERIFY.md walks through the diagnosis.
+If the callback URL is HTTPS behind a self-signed certificate, the server also
+needs `ServiceSettings.EnableInsecureOutgoingConnections` (or a trusted CA).
 
 ### Confirm the token works
 
@@ -154,9 +188,30 @@ Otherwise, run `/manage-channels` to wire this channel to an agent group.
 
 **The bot can't see a channel or can't DM someone.** The bot account must be added as a member of any channel it should read/post in — bot accounts don't auto-join. For DMs, the target user must exist and be reachable via `/api/v4/channels/direct`.
 
-**Known feature gaps** (inherent to this community adapter, not a NanoClaw bug):
-- File uploads can't be edited after posting — a follow-up edit that adds/changes an attachment posts a new message instead.
-- Interactive cards (buttons/selects) are not wired up — the adapter supports rendering them, but only when constructed with a `callbackUrl` for Mattermost to call back on, which this integration doesn't currently configure. Cards fall back to a plain-text rendering.
+**Card buttons do nothing when clicked.** See VERIFY.md — this is the one silent failure: `MATTERMOST_CALLBACK_URL` is unset, unreachable from the Mattermost server, or not allowed as an untrusted internal connection.
+
+**Clicks return a red error in Mattermost after the secret was added.** The card predates `MATTERMOST_CALLBACK_SECRET`; its buttons carry no secret and are refused with 401. Trigger the card again.
+
+**Known feature gaps** (adapter-level):
 - Streaming responses fall back to post-and-edit (no native streaming transport), so long responses may appear to "jump" rather than stream in place.
-- Slash commands and modals are not supported — only plain message send/receive and reactions.
-- Rate-limit responses aren't specially surfaced; sustained high-volume channels may see delivery errors during Mattermost API throttling.
+- Slash commands and modals are not supported — messages, reactions, files, DMs, ephemeral posts and interactive message attachments only.
+- A `429` is waited out once, for as long as the server's `Retry-After` asks; a second one in a row surfaces as a delivery error.
+
+## Migrating from `chat-adapter-mattermost@1.1.3`
+
+Earlier revisions of this skill installed the unscoped npm package. Its thread
+ids were `mattermost:<base64url(channelId)>`; this adapter uses the raw
+channel id (`mattermost:<channelId>`, 26 lowercase alphanumerics). Messaging
+groups wired under the old package therefore stop matching after the swap —
+the first inbound message creates a fresh, unwired group and is dropped as
+`Channel registration skipped`. `ncl messaging-groups update` cannot change
+`platform_id`, so:
+
+1. `pnpm uninstall chat-adapter-mattermost` and install as in step 4 (the
+   import name changes, so re-copy `src/channels/mattermost.ts` from the
+   `channels` branch too).
+2. `ncl messaging-groups list` — note every `mattermost:` group whose id is
+   not 26 lowercase alphanumerics.
+3. Re-wire each one through `/manage-channels` using the raw channel id
+   (the `/api/v4/channels/direct` lookup above prints it), then delete the
+   old group.
