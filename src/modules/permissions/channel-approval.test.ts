@@ -38,6 +38,29 @@ const telegramDefaults: ChannelDefaults = {
 };
 registerChannelAdapter('telegram', { factory: () => null, defaults: telegramDefaults });
 
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execFile: vi.fn(
+      (
+        _file: string,
+        args: string[],
+        _options: Record<string, unknown>,
+        callback: (error: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        void globalThis
+          .fetch(args.at(-1) ?? '')
+          .then(async (response) => callback(null, await response.text(), ''))
+          .catch((error: unknown) =>
+            callback(error instanceof Error ? error : new Error('mock OneCLI request failed'), '', ''),
+          );
+        return {};
+      },
+    ),
+  };
+});
+
 // Mock container runner — prevent actual docker spawn.
 vi.mock('../../container-runner.js', () => ({
   wakeContainer: vi.fn().mockResolvedValue(undefined),
@@ -100,6 +123,11 @@ beforeEach(async () => {
   const db = await initTestDb();
   await runMigrations(db);
 
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 'RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic' }] }))),
+  );
+
   await import('./index.js'); // register hooks
 
   // Base fixtures: one agent group + owner with a DM on 'telegram'.
@@ -132,12 +160,33 @@ beforeEach(async () => {
     'mg-dm-owner',
     now(),
   );
+  await getDb().run(
+    `INSERT INTO opencode_model_providers (
+         id, name, provider_id, discovery_type, base_url, models_url,
+         context_limit, output_limit, input_modalities, delivery_mode,
+         instructions, enabled, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    'provider-local',
+    'Spark local',
+    'openai',
+    'openai-compatible',
+    'http://172.17.0.1:8000/v1',
+    null,
+    65536,
+    8192,
+    'image',
+    'tools-only',
+    'Use tools to deliver every response.',
+    now(),
+    now(),
+  );
 
   deliverMock.mockClear();
 });
 
 afterEach(async () => {
   await closeDb();
+  vi.unstubAllGlobals();
   if (fs.existsSync(TEST_DIR)) fs.rmSync(TEST_DIR, { recursive: true });
 });
 
@@ -424,6 +473,26 @@ describe('unknown-channel registration flow', () => {
     });
     await new Promise((r) => setTimeout(r, 10));
 
+    // Registration provisions the OpenCode runtime before the group exists:
+    // model provider -> live-discovered model -> explicit confirmation.
+    for (const value of [
+      'opencode_provider:provider-local',
+      'opencode_model:openai%2FRedHatAI%2Fgemma-4-26B-A4B-it-FP8-dynamic',
+      'confirm_new_agent',
+    ]) {
+      for (const handler of getResponseHandlers()) {
+        const claimed = await handler({
+          questionId: pending.messaging_group_id,
+          value,
+          userId: 'owner',
+          channelType: 'telegram',
+          platformId: 'dm-owner',
+          threadId: null,
+        });
+        if (claimed) break;
+      }
+    }
+
     const select =
       'SELECT engage_mode, engage_pattern, sender_scope, ignored_message_policy, session_mode, priority ' +
       'FROM messaging_group_agents WHERE messaging_group_id = ?';
@@ -590,7 +659,7 @@ describe('unknown-channel registration flow', () => {
     expect(stillPending).toBe(1);
   });
 
-  it('create new agent: the free-text name reply creates the group and wires the channel', async () => {
+  it('create new agent: name → OpenCode provider → model → confirm provisions and wires', async () => {
     const { routeInbound } = await import('../../router.js');
     const { getResponseHandlers } = await import('../../response-registry.js');
 
@@ -612,8 +681,8 @@ describe('unknown-channel registration flow', () => {
       if (claimed) break;
     }
 
-    // Owner replies with the agent name in the same DM — the interceptor
-    // captures it and creates.
+    // Owner replies with the agent name in the same DM — the restart-safe
+    // interceptor stores it and offers enabled OpenCode model providers.
     await routeInbound({
       channelType: 'telegram',
       platformId: 'dm-owner',
@@ -626,6 +695,34 @@ describe('unknown-channel registration flow', () => {
       },
     });
 
+    expect(
+      (
+        await getDb().get<{ provisioning_step: string }>(
+          'SELECT provisioning_step FROM pending_channel_approvals WHERE messaging_group_id = ?',
+          pending.messaging_group_id,
+        )
+      )?.provisioning_step,
+    ).toBe('awaiting_provider');
+
+    // Provider then live-discovered model then final confirmation.
+    for (const value of [
+      'opencode_provider:provider-local',
+      'opencode_model:openai%2FRedHatAI%2Fgemma-4-26B-A4B-it-FP8-dynamic',
+      'confirm_new_agent',
+    ]) {
+      for (const handler of getResponseHandlers()) {
+        const claimed = await handler({
+          questionId: pending.messaging_group_id,
+          value,
+          userId: 'owner',
+          channelType: 'telegram',
+          platformId: 'dm-owner',
+          threadId: null,
+        });
+        if (claimed) break;
+      }
+    }
+
     const created = await getDb().get<{ id: string }>("SELECT id FROM agent_groups WHERE name = 'Newbie'");
     expect(created).toBeDefined();
     const mgaCount = await countRows(
@@ -634,8 +731,109 @@ describe('unknown-channel registration flow', () => {
       created!.id,
     );
     expect(mgaCount).toBe(1);
+    const config = await getDb().get<{
+      provider: string;
+      model: string;
+      delivery_mode: string;
+      provider_settings: string;
+    }>('SELECT * FROM container_configs WHERE agent_group_id = ?', created!.id);
+    expect(config).toBeDefined();
+    expect(config!.provider).toBe('opencode');
+    expect(config!.model).toBe('openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic');
+    expect(config!.delivery_mode).toBe('tools-only');
+    expect(JSON.parse(config!.provider_settings)).toEqual({
+      opencode: {
+        modelProvider: 'openai',
+        baseUrl: 'http://172.17.0.1:8000/v1',
+        smallModel: 'openai/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic',
+        contextLimit: 65536,
+        outputLimit: 8192,
+        inputModalities: 'image',
+      },
+    });
     const stillPending = await countRows('SELECT COUNT(*) AS c FROM pending_channel_approvals');
     expect(stillPending).toBe(0);
+  });
+
+  it('searches a live provider catalog before rendering a large model list', async () => {
+    const { routeInbound } = await import('../../router.js');
+    const { getResponseHandlers } = await import('../../response-registry.js');
+    const { getDb } = await import('../../db/connection.js');
+    vi.mocked(globalThis.fetch).mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: Array.from({ length: 10 }, (_, index) => ({ id: `model-${index}` })),
+          }),
+        ),
+    );
+
+    await routeInbound(groupMention('chat-model-search'));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const pending = (await getDb().get<{ messaging_group_id: string }>(
+      'SELECT messaging_group_id FROM pending_channel_approvals',
+    ))!;
+
+    const click = async (value: string) => {
+      for (const handler of getResponseHandlers()) {
+        if (
+          await handler({
+            questionId: pending.messaging_group_id,
+            value,
+            userId: 'owner',
+            channelType: 'telegram',
+            platformId: 'dm-owner',
+            threadId: null,
+          })
+        ) {
+          break;
+        }
+      }
+    };
+
+    await click('new_agent');
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: 'dm-owner',
+      threadId: null,
+      message: {
+        id: 'name-reply-search',
+        kind: 'chat' as const,
+        content: JSON.stringify({ senderId: 'owner', text: 'Searchy' }),
+        timestamp: now(),
+      },
+    });
+    await click('opencode_provider:provider-local');
+
+    expect(
+      (
+        await getDb().get<{ provisioning_step: string }>(
+          'SELECT provisioning_step FROM pending_channel_approvals WHERE messaging_group_id = ?',
+          pending.messaging_group_id,
+        )
+      )?.provisioning_step,
+    ).toBe('awaiting_model_query');
+
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: 'dm-owner',
+      threadId: null,
+      message: {
+        id: 'model-search-reply',
+        kind: 'chat' as const,
+        content: JSON.stringify({ senderId: 'owner', text: 'model-9' }),
+        timestamp: now(),
+      },
+    });
+
+    const narrowed = (await getDb().get<{ provisioning_step: string; options_json: string }>(
+      'SELECT provisioning_step, options_json FROM pending_channel_approvals WHERE messaging_group_id = ?',
+      pending.messaging_group_id,
+    ))!;
+    expect(narrowed.provisioning_step).toBe('awaiting_model');
+    expect(JSON.parse(narrowed.options_json)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ value: 'opencode_model:openai%2Fmodel-9' })]),
+    );
   });
 
   it('a name reply after the registration vanished is consumed without creating anything', async () => {

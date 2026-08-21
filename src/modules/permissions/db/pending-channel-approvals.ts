@@ -23,9 +23,31 @@ export interface PendingChannelApproval {
   question: string;
   /** Normalized options (JSON-encoded NormalizedOption[]) — same shape persisted on pending_approvals. */
   options_json: string;
+  provisioning_step:
+    | 'idle'
+    | 'awaiting_name'
+    | 'awaiting_provider'
+    | 'awaiting_model_query'
+    | 'awaiting_model'
+    | 'awaiting_confirmation';
+  new_agent_name: string | null;
+  selected_provider_id: string | null;
+  selected_model_id: string | null;
 }
 
-export async function createPendingChannelApproval(row: PendingChannelApproval): Promise<void> {
+export async function createPendingChannelApproval(
+  row: Pick<
+    PendingChannelApproval,
+    | 'messaging_group_id'
+    | 'agent_group_id'
+    | 'original_message'
+    | 'approver_user_id'
+    | 'created_at'
+    | 'title'
+    | 'question'
+    | 'options_json'
+  >,
+): Promise<void> {
   await getDb().run(
     `INSERT INTO pending_channel_approvals (
          messaging_group_id, agent_group_id, original_message,
@@ -66,6 +88,38 @@ export async function updatePendingChannelApprovalCard(
     question,
     optionsJson,
     messagingGroupId,
+  );
+}
+
+export async function updatePendingChannelProvisioning(
+  messagingGroupId: string,
+  updates: Partial<
+    Pick<PendingChannelApproval, 'provisioning_step' | 'new_agent_name' | 'selected_provider_id' | 'selected_model_id'>
+  >,
+): Promise<void> {
+  const entries = Object.entries(updates);
+  if (entries.length === 0) return;
+  const values: Record<string, unknown> = { messaging_group_id: messagingGroupId };
+  const set = entries.map(([key, value]) => {
+    values[key] = value;
+    return `${key} = @${key}`;
+  });
+  await getDb().run(
+    `UPDATE pending_channel_approvals SET ${set.join(', ')} WHERE messaging_group_id = @messaging_group_id`,
+    values,
+  );
+}
+
+/** Oldest restart-safe name or model-search prompt for this approver. */
+export async function getPendingTextInputForApprover(
+  approverUserId: string,
+): Promise<PendingChannelApproval | undefined> {
+  return getDb().get<PendingChannelApproval>(
+    `SELECT * FROM pending_channel_approvals
+        WHERE approver_user_id = ? AND provisioning_step IN ('awaiting_name', 'awaiting_model_query')
+        ORDER BY created_at, messaging_group_id
+        LIMIT 1`,
+    approverUserId,
   );
 }
 

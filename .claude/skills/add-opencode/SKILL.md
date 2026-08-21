@@ -7,31 +7,30 @@ description: Use OpenCode as an agent provider. OpenRouter, OpenAI, Google, Deep
 
 NanoClaw runs agents in a long-lived **poll loop** inside the container. The backend is selected per agent group by the **`provider`** key in that group's `container.json` (materialized from the `container_configs` table) — set it with `ncl groups config update --provider opencode`. Default is `claude`.
 
-Trunk ships with only the `claude` provider baked in. This skill copies the OpenCode provider files in from the `providers` branch, wires them into the host and container barrels, installs dependencies, and rebuilds the image.
+Trunk ships the `claude` and `opencode` providers baked in. On a current checkout there is nothing to install — run the pre-flight below to confirm, then go to [Configuration](#configuration). The steps that follow only apply to legacy checkouts from before the provider landed in trunk: copy in any missing provider files, wire the barrels, match the dependency pins, and rebuild the image.
 
 ## Install
 
-### 1. Copy the provider payload
+### Pre-flight
 
-Fetch the `providers` branch from the configured remote that carries it, then
-overwrite every skill-owned provider file with its canonical registry copy:
+Check whether the payload is already wired (a current trunk, or a prior apply). All of these present means installed — skip to [Configuration](#configuration):
 
-```nc:copy from-branch:providers
-src/providers/opencode.ts
-src/providers/opencode-registration.test.ts
-container/agent-runner/src/providers/opencode.ts
-container/agent-runner/src/providers/mcp-to-opencode.ts
-container/agent-runner/src/providers/mcp-to-opencode.test.ts
-container/agent-runner/src/providers/opencode-registration.test.ts
-container/agent-runner/src/providers/opencode.attachments.test.ts
-container/agent-runner/src/providers/opencode.compaction.test.ts
-container/agent-runner/src/providers/opencode.config.test.ts
-container/agent-runner/src/providers/opencode.factory.test.ts
-container/agent-runner/src/providers/opencode.memory.test.ts
-container/agent-runner/src/providers/opencode.question.test.ts
-```
+- `src/providers/opencode.ts` and `src/providers/opencode-model-discovery.ts`
+- `container/agent-runner/src/providers/opencode.ts` and `mcp-to-opencode.ts`
+- the provider's test files (attachments, compaction, config, factory, memory, question, registration, empty-resume)
+- `import './opencode.js';` in `src/providers/index.ts` and `container/agent-runner/src/providers/index.ts`
+- an `opencode-ai` entry in `container/cli-tools.json` and `@opencode-ai/sdk` in `container/agent-runner/package.json`
 
-(`cwd-shim.ts` and its test are deliberately **not** in this payload even though `mcp-to-opencode.ts` imports the shim: trunk ships and owns them — the default provider imports `cwd-shim.ts` — and every path listed here becomes a skill-owned file that removal deletes.)
+### 1. Copy any missing provider payload (legacy checkouts only)
+
+On a legacy checkout that predates the provider in trunk, fetch the `providers` branch from the configured remote that carries it and copy in **only the files that are absent** from the working tree. Never overwrite a file that already exists here — on trunk the working copy is the canonical one, and the branch copy may be older. If every file is already present, this step is a no-op.
+
+Files belonging to the OpenCode provider:
+
+- `src/providers/opencode.ts`, `src/providers/opencode-registration.test.ts`, `src/providers/opencode-model-discovery.ts`, `src/providers/opencode-model-discovery.test.ts`, `src/providers/opencode-settings.test.ts`
+- `container/agent-runner/src/providers/opencode.ts`, `mcp-to-opencode.ts`, `mcp-to-opencode.test.ts`, `opencode-registration.test.ts`, `opencode.attachments.test.ts`, `opencode.compaction.test.ts`, `opencode.config.test.ts`, `opencode.empty-resume.test.ts`, `opencode.factory.test.ts`, `opencode.memory.test.ts`, `opencode.question.test.ts`
+
+(`cwd-shim.ts` and its test are deliberately **not** part of the payload even though `mcp-to-opencode.ts` imports the shim: trunk ships and owns them — the default provider imports `cwd-shim.ts` — and every path copied in step 1 becomes a skill-owned file that removal deletes.)
 
 ### 2. Register the provider in both runtimes
 

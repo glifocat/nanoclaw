@@ -16,7 +16,12 @@
  * access gate is not registered and core defaults to allow-all.
  */
 import { recordDroppedMessage } from '../../db/dropped-messages.js';
+import { normalizeOptions, type RawOption } from '../../channels/ask-question.js';
 import { getAgentGroup, getAllAgentGroups } from '../../db/agent-groups.js';
+import {
+  getEnabledOpenCodeModelProvider,
+  listEnabledOpenCodeModelProviders,
+} from '../../db/opencode-model-providers.js';
 import { createMessagingGroupAgent, getMessagingGroup, setMessagingGroupDeniedAt } from '../../db/messaging-groups.js';
 import { resolveWiringDefaults } from '../../channels/channel-defaults.js';
 import {
@@ -32,7 +37,14 @@ import type { InboundEvent } from '../../channels/adapter.js';
 import { registerResponseHandler, type ResponsePayload } from '../../response-registry.js';
 import { getDeliveryAdapter } from '../../delivery.js';
 import { log } from '../../log.js';
-import type { MessagingGroup, MessagingGroupAgent } from '../../types.js';
+import { discoverOpenCodeModels } from '../../providers/opencode-model-discovery.js';
+import type {
+  AgentGroup,
+  DiscoveredOpenCodeModel,
+  MessagingGroup,
+  MessagingGroupAgent,
+  OpenCodeModelProvider,
+} from '../../types.js';
 import { guard } from '../../guard/index.js';
 import { channelsRegister, sendersAdmit } from './guard.js';
 import { canAccessAgentGroup } from './access.js';
@@ -49,8 +61,10 @@ import {
 import { addMember } from './db/agent-group-members.js';
 import {
   deletePendingChannelApproval,
+  getPendingTextInputForApprover,
   getPendingChannelApproval,
   updatePendingChannelApprovalCard,
+  updatePendingChannelProvisioning,
   type PendingChannelApproval,
 } from './db/pending-channel-approvals.js';
 import { deletePendingSenderApproval, getPendingSenderApproval } from './db/pending-sender-approvals.js';
@@ -59,15 +73,11 @@ import { getUser, upsertUser } from './db/users.js';
 import { declineAndNotify, requestSenderApproval } from './sender-approval.js';
 import { ensureUserDm } from './user-dm.js';
 
-// ── Free-text name input state ──
-// Tracks approvers waiting for a text reply with the agent name. Keyed by
-// namespaced userId (e.g. "slack:U0ABC"). Cleared on receipt or restart.
-interface PendingNameInput {
-  channelMgId: string;
-  dmChannelType: string;
-  dmPlatformId: string;
-}
-const awaitingNameInput = new Map<string, PendingNameInput>();
+const OPENCODE_PROVIDER_PREFIX = 'opencode_provider:';
+const OPENCODE_MODEL_PREFIX = 'opencode_model:';
+const CONFIRM_NEW_AGENT_VALUE = 'confirm_new_agent';
+const CANCEL_NEW_AGENT_VALUE = 'cancel_new_agent';
+const MODEL_OPTION_LIMIT = 8;
 
 async function extractAndUpsertUser(event: InboundEvent): Promise<string | null> {
   let content: Record<string, unknown>;
@@ -339,6 +349,130 @@ setChannelRequestGate(async (mg, event) => {
   await requestChannelApproval({ messagingGroupId: mg.id, event });
 });
 
+async function deliverRegistrationQuestion(
+  row: PendingChannelApproval,
+  title: string,
+  question: string,
+  rawOptions: RawOption[],
+): Promise<boolean> {
+  const approverDm = await ensureUserDm(row.approver_user_id);
+  const adapter = getDeliveryAdapter();
+  if (!approverDm || !adapter) {
+    log.error('Channel registration: cannot deliver provisioning question', {
+      messagingGroupId: row.messaging_group_id,
+      approverUserId: row.approver_user_id,
+      hasDm: !!approverDm,
+      hasAdapter: !!adapter,
+    });
+    return false;
+  }
+  const options = normalizeOptions(rawOptions);
+  updatePendingChannelApprovalCard(row.messaging_group_id, title, question, JSON.stringify(options));
+  try {
+    await adapter.deliver(
+      approverDm.channel_type,
+      approverDm.platform_id,
+      null,
+      'chat-sdk',
+      JSON.stringify({
+        type: 'ask_question',
+        questionId: row.messaging_group_id,
+        title,
+        question,
+        options,
+      }),
+    );
+    return true;
+  } catch (err) {
+    log.error('Channel registration: provisioning question delivery failed', {
+      messagingGroupId: row.messaging_group_id,
+      title,
+      err,
+    });
+    return false;
+  }
+}
+
+async function deliverRegistrationText(row: PendingChannelApproval, text: string): Promise<void> {
+  const approverDm = await ensureUserDm(row.approver_user_id);
+  const adapter = getDeliveryAdapter();
+  if (!approverDm || !adapter) return;
+  try {
+    await adapter.deliver(approverDm.channel_type, approverDm.platform_id, null, 'chat-sdk', JSON.stringify({ text }));
+  } catch (err) {
+    log.error('Channel registration: provisioning status delivery failed', {
+      messagingGroupId: row.messaging_group_id,
+      err,
+    });
+  }
+}
+
+function filterDiscoveredModels(models: DiscoveredOpenCodeModel[], query: string): DiscoveredOpenCodeModel[] {
+  const needle = query.trim().toLowerCase();
+  return models.filter((model) => model.id.toLowerCase().includes(needle) || model.name.toLowerCase().includes(needle));
+}
+
+async function loadDiscoveredModels(
+  row: PendingChannelApproval,
+  provider: OpenCodeModelProvider,
+): Promise<DiscoveredOpenCodeModel[] | null> {
+  try {
+    return await discoverOpenCodeModels(provider);
+  } catch (err) {
+    log.error('Channel registration: OpenCode model discovery failed', {
+      messagingGroupId: row.messaging_group_id,
+      modelProviderId: provider.id,
+      openCodeProviderId: provider.provider_id,
+      err,
+    });
+    await deliverRegistrationText(
+      row,
+      `Could not read models from ${provider.name}. Check the provider connection and OneCLI rule, then mention the bot again.`,
+    );
+    await deletePendingChannelApproval(row.messaging_group_id);
+    return null;
+  }
+}
+
+async function offerDiscoveredModels(
+  row: PendingChannelApproval,
+  provider: OpenCodeModelProvider,
+  models: DiscoveredOpenCodeModel[],
+): Promise<void> {
+  if (models.length > MODEL_OPTION_LIMIT) {
+    await updatePendingChannelProvisioning(row.messaging_group_id, {
+      provisioning_step: 'awaiting_model_query',
+      selected_provider_id: provider.id,
+      selected_model_id: null,
+    });
+    await deliverRegistrationText(
+      row,
+      `${provider.name} has ${models.length} available models. Reply with part of the model name or ID to search.`,
+    );
+    return;
+  }
+
+  await updatePendingChannelProvisioning(row.messaging_group_id, {
+    provisioning_step: 'awaiting_model',
+    selected_provider_id: provider.id,
+    selected_model_id: null,
+  });
+  const delivered = await deliverRegistrationQuestion(
+    row,
+    '🧠 Choose an OpenCode model',
+    `Which ${provider.name} model should "${row.new_agent_name}" use?`,
+    [
+      ...models.map((model) => ({
+        label: model.name,
+        selectedLabel: `✅ ${model.name}`,
+        value: `${OPENCODE_MODEL_PREFIX}${encodeURIComponent(model.id)}`,
+      })),
+      { label: 'Cancel', selectedLabel: '🙅 Cancelled', value: CANCEL_NEW_AGENT_VALUE },
+    ],
+  );
+  if (!delivered) await deletePendingChannelApproval(row.messaging_group_id);
+}
+
 /**
  * Wire an approved channel to an agent group and replay the stored event.
  * Shared by both approve paths (connect-existing button, free-text new-agent
@@ -447,8 +581,11 @@ async function wireApprovedChannel(
  * Value dispatch:
  *   connect:<id>    — wire to an existing agent group, replay the message
  *   choose_existing — send a follow-up card listing all agents
- *   new_agent       — prompt for a free-text agent name (interceptor
- *                     captures the reply and creates immediately)
+ *   new_agent       — begin the OpenCode provisioning wizard
+ *   opencode_provider:<id> — choose a configured model-provider connection
+ *   opencode_model:<id>    — choose a model discovered from that provider
+ *   confirm_new_agent      — provision, wire, and replay
+ *   cancel_new_agent       — abandon provisioning without denying channel
  *   reject          — set denied_at, delete pending row
  */
 async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<boolean> {
@@ -490,6 +627,7 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
 
   // ── Choose existing agent — send agent-selection follow-up card ──
   if (payload.value === CHOOSE_EXISTING_VALUE) {
+    if (row.provisioning_step !== 'idle') return true;
     const approverDm = await ensureUserDm(row.approver_user_id);
     if (!approverDm) {
       log.error('Channel registration: no DM channel for approver', {
@@ -533,6 +671,13 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
 
   // ── Create new agent — prompt for free-text name ──
   if (payload.value === NEW_AGENT_VALUE) {
+    if (row.provisioning_step !== 'idle') {
+      log.warn('Channel registration: stale new-agent click ignored', {
+        messagingGroupId: row.messaging_group_id,
+        step: row.provisioning_step,
+      });
+      return true;
+    }
     const approverDm = await ensureUserDm(row.approver_user_id);
     if (!approverDm) {
       log.error('Channel registration: no DM channel for approver', {
@@ -550,10 +695,11 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
       return true;
     }
 
-    awaitingNameInput.set(row.approver_user_id, {
-      channelMgId: row.messaging_group_id,
-      dmChannelType: approverDm.channel_type,
-      dmPlatformId: approverDm.platform_id,
+    await updatePendingChannelProvisioning(row.messaging_group_id, {
+      provisioning_step: 'awaiting_name',
+      new_agent_name: null,
+      selected_provider_id: null,
+      selected_model_id: null,
     });
 
     try {
@@ -569,15 +715,175 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
         messagingGroupId: row.messaging_group_id,
         err,
       });
-      awaitingNameInput.delete(row.approver_user_id);
+      await updatePendingChannelProvisioning(row.messaging_group_id, { provisioning_step: 'idle' });
     }
     return true;
   }
 
-  // ── Resolve target agent group (connect to existing or create new) ──
+  // ── OpenCode model provider ──
+  if (payload.value.startsWith(OPENCODE_PROVIDER_PREFIX)) {
+    if (row.provisioning_step !== 'awaiting_provider' || !row.new_agent_name) {
+      log.warn('Channel registration: stale OpenCode provider click ignored', {
+        messagingGroupId: row.messaging_group_id,
+        step: row.provisioning_step,
+      });
+      return true;
+    }
+    let providerId: string;
+    try {
+      providerId = decodeURIComponent(payload.value.slice(OPENCODE_PROVIDER_PREFIX.length));
+    } catch {
+      log.warn('Channel registration: malformed OpenCode provider response ignored', {
+        messagingGroupId: row.messaging_group_id,
+      });
+      return true;
+    }
+    const modelProvider = getEnabledOpenCodeModelProvider(providerId);
+    if (!modelProvider) {
+      await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
+      await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+    const models = await loadDiscoveredModels(row, modelProvider);
+    if (models) await offerDiscoveredModels(row, modelProvider, models);
+    return true;
+  }
+
+  // ── Discovered OpenCode model ──
+  if (payload.value.startsWith(OPENCODE_MODEL_PREFIX)) {
+    if (row.provisioning_step !== 'awaiting_model' || !row.new_agent_name || !row.selected_provider_id) {
+      log.warn('Channel registration: stale OpenCode model click ignored', {
+        messagingGroupId: row.messaging_group_id,
+        step: row.provisioning_step,
+      });
+      return true;
+    }
+    let modelId: string;
+    try {
+      modelId = decodeURIComponent(payload.value.slice(OPENCODE_MODEL_PREFIX.length));
+    } catch {
+      log.warn('Channel registration: malformed OpenCode model response ignored', {
+        messagingGroupId: row.messaging_group_id,
+      });
+      return true;
+    }
+    const modelProvider = getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    if (!modelProvider) {
+      await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
+      await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+    const models = await loadDiscoveredModels(row, modelProvider);
+    if (!models) return true;
+    const model = models.find((candidate) => candidate.id === modelId);
+    if (!model) {
+      await deliverRegistrationText(row, 'That model is no longer available from the provider. Start again.');
+      await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+    await updatePendingChannelProvisioning(row.messaging_group_id, {
+      provisioning_step: 'awaiting_confirmation',
+      selected_model_id: model.id,
+    });
+    const endpoint = modelProvider.base_url ? ` via ${modelProvider.base_url}` : '';
+    const delivered = await deliverRegistrationQuestion(
+      row,
+      '✅ Confirm new OpenCode agent',
+      `Create "${row.new_agent_name}" with ${model.id}${endpoint}?`,
+      [
+        {
+          label: 'Create and connect',
+          selectedLabel: '✅ Creating…',
+          value: CONFIRM_NEW_AGENT_VALUE,
+          style: 'primary',
+        },
+        { label: 'Cancel', selectedLabel: '🙅 Cancelled', value: CANCEL_NEW_AGENT_VALUE },
+      ],
+    );
+    if (!delivered) await deletePendingChannelApproval(row.messaging_group_id);
+    return true;
+  }
+
+  // ── Cancel OpenCode provisioning without denying the channel ──
+  if (payload.value === CANCEL_NEW_AGENT_VALUE) {
+    await deletePendingChannelApproval(row.messaging_group_id);
+    await deliverRegistrationText(
+      row,
+      'OpenCode agent creation cancelled. Mention the bot again to restart registration.',
+    );
+    return true;
+  }
+
+  // ── Confirm OpenCode provisioning ──
+  if (payload.value === CONFIRM_NEW_AGENT_VALUE) {
+    if (
+      row.provisioning_step !== 'awaiting_confirmation' ||
+      !row.new_agent_name ||
+      !row.selected_provider_id ||
+      !row.selected_model_id
+    ) {
+      log.warn('Channel registration: stale OpenCode confirmation ignored', {
+        messagingGroupId: row.messaging_group_id,
+        step: row.provisioning_step,
+      });
+      return true;
+    }
+    const modelProvider = getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    if (!modelProvider) {
+      await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
+      await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+    const models = await loadDiscoveredModels(row, modelProvider);
+    if (!models) return true;
+    const model = models.find((candidate) => candidate.id === row.selected_model_id);
+    if (!model) {
+      await deliverRegistrationText(row, 'That model is no longer available from the provider. Start again.');
+      await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+
+    let ag: AgentGroup;
+    try {
+      ag = await createNewAgentGroup(row.new_agent_name, modelProvider, model);
+    } catch (err) {
+      log.error('Channel registration: OpenCode agent provisioning failed', {
+        messagingGroupId: row.messaging_group_id,
+        agentName: row.new_agent_name,
+        modelProviderId: modelProvider.id,
+        modelId: model.id,
+        err,
+      });
+      await deliverRegistrationText(
+        row,
+        'OpenCode agent creation failed before the channel was connected. Check the host logs, then press Create and connect again.',
+      );
+      return true;
+    }
+    log.info('Channel registration: provisioned OpenCode agent group', {
+      messagingGroupId: row.messaging_group_id,
+      agentGroupId: ag.id,
+      agentName: ag.name,
+      folder: ag.folder,
+      modelProvider: modelProvider.provider_id,
+      model: model.id,
+      modelProviderId: modelProvider.id,
+    });
+    const wired = await wireApprovedChannel(row, ag.id, approverId);
+    await deliverRegistrationText(
+      row,
+      wired
+        ? `✅ OpenCode agent "${ag.name}" created with ${model.id} and connected.`
+        : `⚠️ OpenCode agent "${ag.name}" was created but the channel couldn't be connected — check the host logs.`,
+    );
+    return true;
+  }
+
+  // ── Resolve existing target agent group ──
   let targetAgentGroupId: string;
 
   if (payload.value.startsWith(CONNECT_PREFIX)) {
+    if (row.provisioning_step !== 'idle') return true;
     targetAgentGroupId = payload.value.slice(CONNECT_PREFIX.length);
     const ag = await getAgentGroup(targetAgentGroupId);
     if (!ag) {
@@ -611,19 +917,19 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
 
 registerResponseHandler(handleChannelApprovalResponse);
 
-// ── Free-text name interceptor ──
-// Captures the next DM from an approver who clicked "Create new agent",
-// creates the agent immediately, wires the channel, and replays.
+// ── Restart-safe free-text provisioning interceptor ──
+// Captures either the new-agent name or a model-catalog search query.
 
 registerMessageInterceptor(async (event: InboundEvent): Promise<boolean> => {
   const userId = await extractAndUpsertUser(event);
   if (!userId) return false;
 
-  const pending = awaitingNameInput.get(userId);
-  if (!pending) return false;
-  if (event.channelType !== pending.dmChannelType || event.platformId !== pending.dmPlatformId) return false;
-
-  awaitingNameInput.delete(userId);
+  const row = await getPendingTextInputForApprover(userId);
+  if (!row) return false;
+  const approverDm = await ensureUserDm(userId);
+  if (!approverDm || event.channelType !== approverDm.channel_type || event.platformId !== approverDm.platform_id) {
+    return false;
+  }
 
   let text: string | undefined;
   try {
@@ -634,41 +940,74 @@ registerMessageInterceptor(async (event: InboundEvent): Promise<boolean> => {
   }
 
   if (!text) {
-    log.warn('Channel registration: empty name reply, ignoring', { userId });
+    log.warn('Channel registration: empty provisioning reply, ignoring', { userId });
     return true;
   }
 
-  const row = await getPendingChannelApproval(pending.channelMgId);
-  if (!row) return true;
-
-  const ag = await createNewAgentGroup(text);
-  log.info('Channel registration: new agent group created', {
-    messagingGroupId: row.messaging_group_id,
-    agentGroupId: ag.id,
-    agentName: ag.name,
-    folder: ag.folder,
-  });
-
-  const wired = await wireApprovedChannel(row, ag.id, userId);
-
-  const adapter = getDeliveryAdapter();
-  if (adapter) {
-    const dm = await ensureUserDm(row.approver_user_id);
-    if (dm) {
-      adapter
-        .deliver(
-          dm.channel_type,
-          dm.platform_id,
-          null,
-          'chat-sdk',
-          JSON.stringify({
-            text: wired
-              ? `✅ Agent "${ag.name}" created and connected.`
-              : `⚠️ Agent "${ag.name}" was created but the channel couldn't be connected — check the host logs.`,
-          }),
-        )
-        .catch(() => {});
-    }
+  if (text.toLowerCase() === 'cancel' || text.toLowerCase() === '/cancel') {
+    await deletePendingChannelApproval(row.messaging_group_id);
+    await deliverRegistrationText(row, 'Agent creation cancelled.');
+    return true;
   }
+
+  if (row.provisioning_step === 'awaiting_model_query') {
+    if (!row.selected_provider_id) {
+      await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+    const modelProvider = getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    if (!modelProvider) {
+      await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
+      await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+    const models = await loadDiscoveredModels(row, modelProvider);
+    if (!models) return true;
+    const matches = filterDiscoveredModels(models, text);
+    if (matches.length === 0) {
+      await deliverRegistrationText(row, `No ${modelProvider.name} models matched "${text}". Try another search.`);
+      return true;
+    }
+    if (matches.length > MODEL_OPTION_LIMIT) {
+      await deliverRegistrationText(
+        row,
+        `${matches.length} ${modelProvider.name} models matched "${text}". Reply with a more specific name or ID.`,
+      );
+      return true;
+    }
+    await offerDiscoveredModels(row, modelProvider, matches);
+    return true;
+  }
+
+  const modelProviders = listEnabledOpenCodeModelProviders();
+  if (modelProviders.length === 0) {
+    await deletePendingChannelApproval(row.messaging_group_id);
+    await deliverRegistrationText(
+      row,
+      'No enabled OpenCode model providers are configured. Add one with `ncl opencode-model-providers create`, then mention the bot again.',
+    );
+    return true;
+  }
+
+  await updatePendingChannelProvisioning(row.messaging_group_id, {
+    provisioning_step: 'awaiting_provider',
+    new_agent_name: text,
+    selected_provider_id: null,
+    selected_model_id: null,
+  });
+  const delivered = await deliverRegistrationQuestion(
+    row,
+    '☁️ Choose an OpenCode provider',
+    `Which model provider should "${text}" use?`,
+    [
+      ...modelProviders.map((modelProvider) => ({
+        label: modelProvider.name,
+        selectedLabel: `✅ ${modelProvider.name}`,
+        value: `${OPENCODE_PROVIDER_PREFIX}${encodeURIComponent(modelProvider.id)}`,
+      })),
+      { label: 'Cancel', selectedLabel: '🙅 Cancelled', value: CANCEL_NEW_AGENT_VALUE },
+    ],
+  );
+  if (!delivered) await deletePendingChannelApproval(row.messaging_group_id);
   return true;
 });
