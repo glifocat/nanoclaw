@@ -77,6 +77,8 @@ import { ensureUserDm } from './user-dm.js';
 const OPENCODE_PROVIDER_PREFIX = 'opencode_provider:';
 const OPENCODE_MODEL_PREFIX = 'opencode_model:';
 const OPENCODE_AUTH_CONTINUE_PREFIX = 'opencode_auth_continue:';
+const OPENCODE_INLINE_LOCAL_VALUE = 'opencode_inline_local';
+const OPENCODE_INLINE_LOCAL_ID = '__inline_local__';
 const CONFIRM_NEW_AGENT_VALUE = 'confirm_new_agent';
 const CANCEL_NEW_AGENT_VALUE = 'cancel_new_agent';
 const MODEL_OPTION_LIMIT = 8;
@@ -436,6 +438,20 @@ async function loadDiscoveredModels(
   }
 }
 
+function inlineModelProvider(row: PendingChannelApproval): OpenCodeModelProvider | undefined {
+  if (!row.pending_provider_json) return undefined;
+  try {
+    return JSON.parse(row.pending_provider_json) as OpenCodeModelProvider;
+  } catch {
+    return undefined;
+  }
+}
+
+async function resolveSelectedModelProvider(row: PendingChannelApproval): Promise<OpenCodeModelProvider | undefined> {
+  if (row.selected_provider_id === OPENCODE_INLINE_LOCAL_ID) return inlineModelProvider(row);
+  return row.selected_provider_id ? getEnabledOpenCodeModelProvider(row.selected_provider_id) : undefined;
+}
+
 async function offerDiscoveredModels(
   row: PendingChannelApproval,
   provider: OpenCodeModelProvider,
@@ -774,9 +790,24 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
     return true;
   }
 
+  if (payload.value === OPENCODE_INLINE_LOCAL_VALUE) {
+    if (row.provisioning_step !== 'awaiting_provider' || !row.new_agent_name) return true;
+    await updatePendingChannelProvisioning(row.messaging_group_id, {
+      provisioning_step: 'awaiting_local_url',
+      selected_provider_id: OPENCODE_INLINE_LOCAL_ID,
+      selected_model_id: null,
+      pending_provider_json: null,
+    });
+    await deliverRegistrationText(
+      row,
+      'Reply with the local or custom OpenAI-compatible base URL, including `/v1` (for example `http://host.docker.internal:8891/v1`). The endpoint must be reachable from the agent container. Reply `cancel` to stop.',
+    );
+    return true;
+  }
+
   if (payload.value.startsWith(OPENCODE_AUTH_CONTINUE_PREFIX)) {
     if (row.provisioning_step !== 'awaiting_auth' || !row.selected_provider_id) return true;
-    const modelProvider = await getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    const modelProvider = await resolveSelectedModelProvider(row);
     if (!modelProvider) {
       await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
       await deletePendingChannelApproval(row.messaging_group_id);
@@ -812,7 +843,7 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
       });
       return true;
     }
-    const modelProvider = await getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    const modelProvider = await resolveSelectedModelProvider(row);
     if (!modelProvider) {
       await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
       await deletePendingChannelApproval(row.messaging_group_id);
@@ -873,7 +904,7 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
       });
       return true;
     }
-    const modelProvider = await getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    const modelProvider = await resolveSelectedModelProvider(row);
     if (!modelProvider) {
       await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
       await deletePendingChannelApproval(row.messaging_group_id);
@@ -1000,7 +1031,7 @@ registerMessageInterceptor(async (event: InboundEvent): Promise<boolean> => {
       await deletePendingChannelApproval(row.messaging_group_id);
       return true;
     }
-    const modelProvider = await getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    const modelProvider = await resolveSelectedModelProvider(row);
     if (!modelProvider) {
       await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
       await deletePendingChannelApproval(row.messaging_group_id);
@@ -1024,16 +1055,72 @@ registerMessageInterceptor(async (event: InboundEvent): Promise<boolean> => {
     return true;
   }
 
-  const modelProviders = await listEnabledOpenCodeModelProviders();
-  if (modelProviders.length === 0) {
-    await deletePendingChannelApproval(row.messaging_group_id);
+  if (row.provisioning_step === 'awaiting_local_url') {
+    let baseUrl: string;
+    try {
+      const parsed = new URL(text);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('unsupported protocol');
+      parsed.hash = '';
+      parsed.search = '';
+      baseUrl = parsed.toString().replace(/\/$/, '');
+    } catch {
+      await deliverRegistrationText(
+        row,
+        'That is not a valid HTTP(S) base URL. Include the full address and `/v1`, then try again.',
+      );
+      return true;
+    }
+    const provider: OpenCodeModelProvider = {
+      id: OPENCODE_INLINE_LOCAL_ID,
+      name: `Local endpoint (${new URL(baseUrl).host})`,
+      provider_id: 'openai',
+      discovery_type: 'openai-compatible',
+      base_url: baseUrl,
+      models_url: null,
+      context_limit: null,
+      output_limit: null,
+      input_modalities: '',
+      delivery_mode: 'tools-only',
+      instructions: null,
+      enabled: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    await updatePendingChannelProvisioning(row.messaging_group_id, {
+      provisioning_step: 'awaiting_local_context',
+      selected_provider_id: OPENCODE_INLINE_LOCAL_ID,
+      pending_provider_json: JSON.stringify(provider),
+    });
     await deliverRegistrationText(
       row,
-      'No enabled OpenCode model providers are configured. Add one with `ncl opencode-model-providers create`, then mention the bot again.',
+      'Reply with the model context window in tokens (for example `32768` or `262144`). NanoClaw uses this to keep OpenCode compaction inside the backend limit.',
     );
     return true;
   }
 
+  if (row.provisioning_step === 'awaiting_local_context') {
+    const contextLimit = Number(text);
+    if (!Number.isSafeInteger(contextLimit) || contextLimit < 1024) {
+      await deliverRegistrationText(row, 'Enter a whole-number context window of at least 1024 tokens.');
+      return true;
+    }
+    const provider = inlineModelProvider(row);
+    if (!provider) {
+      await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+    provider.context_limit = contextLimit;
+    provider.output_limit = Math.min(8192, Math.max(1024, Math.floor(contextLimit / 4)));
+    await updatePendingChannelProvisioning(row.messaging_group_id, {
+      pending_provider_json: JSON.stringify(provider),
+    });
+    const refreshed = (await getPendingChannelApproval(row.messaging_group_id))!;
+    const models = await loadDiscoveredModels(refreshed, provider);
+    if (models) await offerDiscoveredModels(refreshed, provider, models);
+    return true;
+  }
+
+  const modelProviders = await listEnabledOpenCodeModelProviders();
   await updatePendingChannelProvisioning(row.messaging_group_id, {
     provisioning_step: 'awaiting_provider',
     new_agent_name: text,
@@ -1050,6 +1137,11 @@ registerMessageInterceptor(async (event: InboundEvent): Promise<boolean> => {
         selectedLabel: `✅ ${modelProvider.name}`,
         value: `${OPENCODE_PROVIDER_PREFIX}${encodeURIComponent(modelProvider.id)}`,
       })),
+      {
+        label: 'Local or custom endpoint',
+        selectedLabel: '✅ Local or custom endpoint',
+        value: OPENCODE_INLINE_LOCAL_VALUE,
+      },
       { label: 'Cancel', selectedLabel: '🙅 Cancelled', value: CANCEL_NEW_AGENT_VALUE },
     ],
   );

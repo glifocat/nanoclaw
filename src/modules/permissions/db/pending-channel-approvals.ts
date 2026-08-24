@@ -29,12 +29,15 @@ export interface PendingChannelApproval {
     | 'awaiting_name'
     | 'awaiting_provider'
     | 'awaiting_auth'
+    | 'awaiting_local_url'
+    | 'awaiting_local_context'
     | 'awaiting_model_query'
     | 'awaiting_model'
     | 'awaiting_confirmation';
   new_agent_name: string | null;
   selected_provider_id: string | null;
   selected_model_id: string | null;
+  pending_provider_json: string | null;
 }
 
 export async function createPendingChannelApproval(
@@ -96,7 +99,10 @@ export async function updatePendingChannelApprovalCard(
 export async function updatePendingChannelProvisioning(
   messagingGroupId: string,
   updates: Partial<
-    Pick<PendingChannelApproval, 'provisioning_step' | 'new_agent_name' | 'selected_provider_id' | 'selected_model_id'>
+    Pick<
+      PendingChannelApproval,
+      'provisioning_step' | 'new_agent_name' | 'selected_provider_id' | 'selected_model_id' | 'pending_provider_json'
+    >
   >,
 ): Promise<void> {
   const entries = Object.entries(updates);
@@ -118,7 +124,7 @@ export async function getPendingTextInputForApprover(
 ): Promise<PendingChannelApproval | undefined> {
   return getDb().get<PendingChannelApproval>(
     `SELECT * FROM pending_channel_approvals
-        WHERE approver_user_id = ? AND provisioning_step IN ('awaiting_name', 'awaiting_model_query')
+        WHERE approver_user_id = ? AND provisioning_step IN ('awaiting_name', 'awaiting_model_query', 'awaiting_local_url', 'awaiting_local_context')
         ORDER BY created_at, messaging_group_id
         LIMIT 1`,
     approverUserId,

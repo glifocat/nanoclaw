@@ -68,6 +68,16 @@ Cloud discovery matches OpenCode's model picker source, but it represents the pr
 
 Registration copies the selected values into `container_configs.provider_settings`. Later provider edits therefore do not silently change existing groups.
 
+## Add a local endpoint during registration
+
+The provider card always includes **Local or custom endpoint**, so an operator does not need to create a reusable provider connection first. NanoClaw asks for:
+
+1. the OpenAI-compatible base URL, including `/v1`;
+2. the model context window in tokens;
+3. the model discovered live from `<base-url>/models`.
+
+The URL must be reachable from the agent container. For a server on the Docker host, use a container-reachable address such as `http://host.docker.internal:8891/v1`, not `localhost`. Inline endpoints use the OpenAI-compatible chat-completions transport, text input, tools-only delivery, and an output limit capped at 8192 tokens. Their settings are restart-safe while registration is pending and are copied directly into the new group at confirmation; they do not add a reusable row to `opencode-model-providers`.
+
 ## Restart behavior
 
 The pending name, provider, model search, selected model, and confirmation step are stored in the central database. A host restart does not lose the wizard state. NanoClaw rechecks the live model list at selection and confirmation; if the provider or model disappears, it stops the attempt and asks the operator to restart registration.

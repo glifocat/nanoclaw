@@ -26,6 +26,7 @@ import { migration022 } from './022-messaging-group-detached.js';
 import { migration023 } from './023-approvals-instance.js';
 import { migration024 as migration024OpenCodeRegistration } from './024-opencode-registration-provisioning.js';
 import { migration025 as migration025DeliveryMode } from './025-delivery-mode.js';
+import { migration026 as migration026OpenCodeInlineProvider } from './026-opencode-inline-provider.js';
 
 interface MigrationBase {
   version: number;
@@ -93,6 +94,7 @@ export const migrations: Migration[] = [
   migration023,
   migration024OpenCodeRegistration,
   migration025DeliveryMode,
+  migration026OpenCodeInlineProvider,
 ];
 
 /**

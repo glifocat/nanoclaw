@@ -848,6 +848,96 @@ describe('unknown-channel registration flow', () => {
     ).toBe('awaiting_model');
   });
 
+  it('creates a local endpoint inline and snapshots it into the new group', async () => {
+    await getDb().run('DELETE FROM opencode_model_providers');
+    const { routeInbound } = await import('../../router.js');
+    const { getResponseHandlers } = await import('../../response-registry.js');
+    await expectAsyncDelivery(() => routeInbound(groupMention('chat-inline-local')));
+    const pending = (await getDb().get<{ messaging_group_id: string }>(
+      'SELECT messaging_group_id FROM pending_channel_approvals',
+    ))!;
+    const click = async (value: string) => {
+      for (const handler of getResponseHandlers()) {
+        if (
+          await handler({
+            questionId: pending.messaging_group_id,
+            value,
+            userId: 'owner',
+            channelType: 'telegram',
+            platformId: 'dm-owner',
+            threadId: null,
+          })
+        )
+          break;
+      }
+    };
+    const reply = (id: string, text: string) =>
+      routeInbound({
+        channelType: 'telegram',
+        platformId: 'dm-owner',
+        threadId: null,
+        message: {
+          id,
+          kind: 'chat' as const,
+          content: JSON.stringify({ senderId: 'owner', text }),
+          timestamp: now(),
+        },
+      });
+
+    await click('new_agent');
+    await reply('inline-name', 'Local Agent');
+    await click('opencode_inline_local');
+    expect(
+      (
+        await getDb().get<{ provisioning_step: string }>(
+          'SELECT provisioning_step FROM pending_channel_approvals WHERE messaging_group_id = ?',
+          pending.messaging_group_id,
+        )
+      )?.provisioning_step,
+    ).toBe('awaiting_local_url');
+
+    await reply('inline-url', 'http://host.docker.internal:8891/v1');
+    expect(
+      (
+        await getDb().get<{ provisioning_step: string }>(
+          'SELECT provisioning_step FROM pending_channel_approvals WHERE messaging_group_id = ?',
+          pending.messaging_group_id,
+        )
+      )?.provisioning_step,
+    ).toBe('awaiting_local_context');
+    await reply('inline-context', '262144');
+    const configured = (await getDb().get<{ provisioning_step: string; pending_provider_json: string }>(
+      'SELECT provisioning_step, pending_provider_json FROM pending_channel_approvals WHERE messaging_group_id = ?',
+      pending.messaging_group_id,
+    ))!;
+    expect(configured.provisioning_step).toBe('awaiting_model');
+    expect(JSON.parse(configured.pending_provider_json)).toMatchObject({
+      provider_id: 'openai',
+      discovery_type: 'openai-compatible',
+      base_url: 'http://host.docker.internal:8891/v1',
+      delivery_mode: 'tools-only',
+      context_limit: 262144,
+      output_limit: 8192,
+    });
+
+    await click('opencode_model:openai%2FRedHatAI%2Fgemma-4-26B-A4B-it-FP8-dynamic');
+    await click('confirm_new_agent');
+
+    const created = (await getDb().get<{ id: string }>("SELECT id FROM agent_groups WHERE name = 'Local Agent'"))!;
+    const config = (await getDb().get<{ provider_settings: string }>(
+      'SELECT provider_settings FROM container_configs WHERE agent_group_id = ?',
+      created.id,
+    ))!;
+    expect(JSON.parse(config.provider_settings)).toMatchObject({
+      opencode: {
+        modelProvider: 'openai',
+        baseUrl: 'http://host.docker.internal:8891/v1',
+        contextLimit: 262144,
+        outputLimit: 8192,
+      },
+    });
+  });
+
   it('searches a live provider catalog before rendering a large model list', async () => {
     const { routeInbound } = await import('../../router.js');
     const { getResponseHandlers } = await import('../../response-registry.js');

@@ -14,8 +14,8 @@ import type { Migration } from './index.js';
 export const migration024: Migration = {
   version: 24,
   name: 'opencode-registration-provisioning',
-  up(db) {
-    db.exec(`
+  async up(db) {
+    await db.exec(`
       CREATE TABLE opencode_model_providers (
         id                TEXT PRIMARY KEY,
         name              TEXT NOT NULL UNIQUE,
