@@ -2,7 +2,10 @@
  * Host-side container config for the `opencode` provider.
  *
  * OpenCode's `opencode serve` process stores state under XDG_DATA_HOME, which
- * we pin to a per-session host directory mounted at /opencode-xdg. The
+ * we pin to a per-group host directory mounted at /opencode-xdg. OpenCode
+ * keeps OAuth credentials and refreshes in the same XDG data root as its
+ * session data, so group scope lets fresh NanoClaw sessions reuse the group's
+ * authenticated provider without sharing credentials across agent groups.
  * OPENCODE_* env vars tell the CLI which provider/model to use at runtime
  * (read on the host, injected into the container). NO_PROXY / no_proxy are
  * merged with host values so the in-container OpenCode client can talk to
@@ -11,6 +14,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import { DATA_DIR } from '../config.js';
 import { readEnvFile } from '../env.js';
 import { registerProviderContainerConfig } from './provider-container-registry.js';
 
@@ -77,8 +81,21 @@ export function applyOpenCodeProviderSettings(
 }
 
 registerProviderContainerConfig('opencode', (ctx) => {
-  const opencodeDir = path.join(ctx.sessionDir, 'opencode-xdg');
-  fs.mkdirSync(opencodeDir, { recursive: true });
+  const opencodeParent = path.join(DATA_DIR, 'provider-state', 'opencode', 'groups');
+  const opencodeDir = path.join(opencodeParent, encodeURIComponent(ctx.agentGroupId));
+  const legacySessionDir = path.join(ctx.sessionDir, 'opencode-xdg');
+  fs.mkdirSync(opencodeParent, { recursive: true, mode: 0o700 });
+  if (!fs.existsSync(opencodeDir) && fs.existsSync(legacySessionDir)) {
+    try {
+      // Atomic on the data filesystem. If two sessions race, one migrates and
+      // the other observes the winning group root below.
+      fs.renameSync(legacySessionDir, opencodeDir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
+  fs.mkdirSync(opencodeDir, { recursive: true, mode: 0o700 });
+  fs.chmodSync(opencodeDir, 0o700);
 
   const env: Record<string, string> = {
     XDG_DATA_HOME: '/opencode-xdg',

@@ -24,6 +24,8 @@ NanoClaw stores provider connections, not a model allowlist. A connection contai
 
 Connections never contain API keys. Provider credentials stay in OneCLI and are injected into matching outbound HTTP requests.
 
+Native OpenCode cloud credentials (including OAuth refresh tokens) are scoped to the agent group. OpenCode stores them in the group's private provider-state directory, which is mounted into every OpenCode session for that group. A new messaging session can therefore reuse and refresh the group's login, while another agent group cannot see it. Deleting an individual session does not delete the group's cloud login.
+
 For a built-in cloud provider, model discovery reads OpenCode's live Models.dev catalog:
 
 ```bash
