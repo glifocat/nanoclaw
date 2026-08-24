@@ -1,20 +1,16 @@
 import type { OpenCodeModelProvider } from '../types.js';
 import { getDb } from './connection.js';
 
-export function getOpenCodeModelProvider(id: string): OpenCodeModelProvider | undefined {
-  return getDb().prepare('SELECT * FROM opencode_model_providers WHERE id = ?').get(id) as
-    | OpenCodeModelProvider
-    | undefined;
+export async function getOpenCodeModelProvider(id: string): Promise<OpenCodeModelProvider | undefined> {
+  return getDb().get<OpenCodeModelProvider>('SELECT * FROM opencode_model_providers WHERE id = ?', id);
 }
 
-export function getEnabledOpenCodeModelProvider(id: string): OpenCodeModelProvider | undefined {
-  return getDb().prepare('SELECT * FROM opencode_model_providers WHERE id = ? AND enabled = 1').get(id) as
-    | OpenCodeModelProvider
-    | undefined;
+export async function getEnabledOpenCodeModelProvider(id: string): Promise<OpenCodeModelProvider | undefined> {
+  return getDb().get<OpenCodeModelProvider>('SELECT * FROM opencode_model_providers WHERE id = ? AND enabled = 1', id);
 }
 
-export function listEnabledOpenCodeModelProviders(): OpenCodeModelProvider[] {
-  return getDb()
-    .prepare('SELECT * FROM opencode_model_providers WHERE enabled = 1 ORDER BY name, id')
-    .all() as OpenCodeModelProvider[];
+export async function listEnabledOpenCodeModelProviders(): Promise<OpenCodeModelProvider[]> {
+  return getDb().all<OpenCodeModelProvider>(
+    'SELECT * FROM opencode_model_providers WHERE enabled = 1 ORDER BY name, id',
+  );
 }

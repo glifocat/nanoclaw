@@ -7,12 +7,12 @@ import './opencode-model-providers.js';
 const hostCtx = { caller: 'host' as const };
 
 describe('OpenCode model provider CLI resource', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     const db = initTestDb();
-    runMigrations(db);
+    await runMigrations(await db);
   });
 
-  afterEach(() => closeDb());
+  afterEach(async () => closeDb());
 
   it('creates a normalized provider connection without model or credential fields', async () => {
     const row = (await lookup('opencode-model-providers-create')!.handler(

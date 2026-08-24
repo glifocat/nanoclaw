@@ -29,27 +29,27 @@ import './cli/resources/groups.js';
 
 const GID = 'ag-1';
 
-function seedGroup(): void {
-  createAgentGroup({
+async function seedGroup(): Promise<void> {
+  await createAgentGroup({
     id: GID,
     name: 'Casa',
     folder: 'casa',
     agent_provider: null,
     created_at: new Date().toISOString(),
   });
-  ensureContainerConfig(GID);
+  await ensureContainerConfig(GID);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   if (fs.existsSync(TEST_DIR)) fs.rmSync(TEST_DIR, { recursive: true });
   fs.mkdirSync(path.join(TEST_DIR, 'groups', 'casa'), { recursive: true });
   const db = initTestDb();
-  runMigrations(db);
-  seedGroup();
+  await runMigrations(await db);
+  await seedGroup();
 });
 
-afterEach(() => {
-  closeDb();
+afterEach(async () => {
+  await closeDb();
   if (fs.existsSync(TEST_DIR)) fs.rmSync(TEST_DIR, { recursive: true });
 });
 
@@ -58,25 +58,25 @@ function readContainerJson(): ContainerConfig {
 }
 
 describe('column reaches the container', () => {
-  it('omits deliveryMode entirely for a default group', () => {
-    materializeContainerJson(GID);
+  it('omits deliveryMode entirely for a default group', async () => {
+    await materializeContainerJson(GID);
 
     expect(readContainerJson().deliveryMode).toBeUndefined();
   });
 
-  it('writes deliveryMode into container.json once the column is set', () => {
-    updateContainerConfigScalars(GID, { delivery_mode: 'tools-only' });
+  it('writes deliveryMode into container.json once the column is set', async () => {
+    await updateContainerConfigScalars(GID, { delivery_mode: 'tools-only' });
 
-    const returned = materializeContainerJson(GID);
+    const returned = await materializeContainerJson(GID);
 
     expect(returned.deliveryMode).toBe('tools-only');
     expect(readContainerJson().deliveryMode).toBe('tools-only');
   });
 
-  it('drops a value the runner would not recognize rather than passing it through', () => {
-    updateContainerConfigScalars(GID, { delivery_mode: 'tools_only' });
+  it('drops a value the runner would not recognize rather than passing it through', async () => {
+    await updateContainerConfigScalars(GID, { delivery_mode: 'tools_only' });
 
-    materializeContainerJson(GID);
+    await materializeContainerJson(GID);
 
     expect(readContainerJson().deliveryMode).toBeUndefined();
   });
@@ -90,21 +90,21 @@ describe('groups config update --delivery-mode', () => {
       caller: 'host',
     } as never)) as Record<string, unknown>;
 
-    expect(getContainerConfig(GID)?.delivery_mode).toBe('tools-only');
+    expect((await getContainerConfig(GID))?.delivery_mode).toBe('tools-only');
     expect(result.delivery_mode).toBe('tools-only');
   });
 
   it('accepts the underscore spelling too', async () => {
     await handler()({ id: GID, delivery_mode: 'envelope' }, { caller: 'host' } as never);
 
-    expect(getContainerConfig(GID)?.delivery_mode).toBe('envelope');
+    expect((await getContainerConfig(GID))?.delivery_mode).toBe('envelope');
   });
 
   it('rejects anything else and leaves the column alone', async () => {
     await expect(handler()({ id: GID, 'delivery-mode': 'yolo' }, { caller: 'host' } as never)).rejects.toThrow(
       /--delivery-mode must be one of: envelope, tools-only/,
     );
-    expect(getContainerConfig(GID)?.delivery_mode).toBeNull();
+    expect((await getContainerConfig(GID))?.delivery_mode).toBeNull();
   });
 
   it('still refuses a call that names no field at all', async () => {
@@ -116,29 +116,32 @@ describe('an agent cannot widen its own containment', () => {
   const spec = () => commandGuardSpec(lookup('groups-config-update')!);
   const actor = { kind: 'agent', agentGroupId: GID, sessionId: 's1' } as const;
 
-  it('denies delivery_mode outright from a group-scoped agent — not merely holds it', () => {
+  it('denies delivery_mode outright from a group-scoped agent — not merely holds it', async () => {
     for (const key of ['delivery_mode', 'delivery-mode']) {
-      const decision = spec().decide({ actor, payload: { id: GID, [key]: 'envelope' } });
+      const decision = await spec().decide({ actor, payload: { id: GID, [key]: 'envelope' } });
 
       expect(decision.effect).toBe('deny');
       expect(decision.reason).toContain('delivery_mode');
     }
   });
 
-  it('denies it even when the value would keep the group where it is', () => {
-    const decision = spec().decide({ actor, payload: { id: GID, delivery_mode: 'tools-only' } });
+  it('denies it even when the value would keep the group where it is', async () => {
+    const decision = await spec().decide({ actor, payload: { id: GID, delivery_mode: 'tools-only' } });
 
     expect(decision.effect).toBe('deny');
   });
 
-  it('still only holds an ordinary config change from the same agent', () => {
-    const decision = spec().decide({ actor, payload: { id: GID, model: 'some-model' } });
+  it('still only holds an ordinary config change from the same agent', async () => {
+    const decision = await spec().decide({ actor, payload: { id: GID, model: 'some-model' } });
 
     expect(decision.effect).toBe('hold');
   });
 
-  it('leaves the host caller alone', () => {
-    const decision = spec().decide({ actor: { kind: 'host' }, payload: { id: GID, delivery_mode: 'tools-only' } });
+  it('leaves the host caller alone', async () => {
+    const decision = await spec().decide({
+      actor: { kind: 'host' },
+      payload: { id: GID, delivery_mode: 'tools-only' },
+    });
 
     expect(decision.effect).toBe('allow');
   });

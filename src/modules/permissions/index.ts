@@ -738,7 +738,7 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
       });
       return true;
     }
-    const modelProvider = getEnabledOpenCodeModelProvider(providerId);
+    const modelProvider = await getEnabledOpenCodeModelProvider(providerId);
     if (!modelProvider) {
       await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
       await deletePendingChannelApproval(row.messaging_group_id);
@@ -767,7 +767,7 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
       });
       return true;
     }
-    const modelProvider = getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    const modelProvider = await getEnabledOpenCodeModelProvider(row.selected_provider_id);
     if (!modelProvider) {
       await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
       await deletePendingChannelApproval(row.messaging_group_id);
@@ -828,7 +828,7 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
       });
       return true;
     }
-    const modelProvider = getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    const modelProvider = await getEnabledOpenCodeModelProvider(row.selected_provider_id);
     if (!modelProvider) {
       await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
       await deletePendingChannelApproval(row.messaging_group_id);
@@ -955,7 +955,7 @@ registerMessageInterceptor(async (event: InboundEvent): Promise<boolean> => {
       await deletePendingChannelApproval(row.messaging_group_id);
       return true;
     }
-    const modelProvider = getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    const modelProvider = await getEnabledOpenCodeModelProvider(row.selected_provider_id);
     if (!modelProvider) {
       await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
       await deletePendingChannelApproval(row.messaging_group_id);
@@ -979,7 +979,7 @@ registerMessageInterceptor(async (event: InboundEvent): Promise<boolean> => {
     return true;
   }
 
-  const modelProviders = listEnabledOpenCodeModelProviders();
+  const modelProviders = await listEnabledOpenCodeModelProviders();
   if (modelProviders.length === 0) {
     await deletePendingChannelApproval(row.messaging_group_id);
     await deliverRegistrationText(

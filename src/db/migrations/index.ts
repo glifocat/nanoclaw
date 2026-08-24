@@ -24,8 +24,8 @@ import { migration020 } from './020-container-config-timezone.js';
 import { migration021 } from './021-approval-question.js';
 import { migration022 } from './022-messaging-group-detached.js';
 import { migration023 } from './023-approvals-instance.js';
-import { migration023 as migration024OpenCodeRegistration } from './023-opencode-registration-provisioning.js';
-import { migration024 as migration025DeliveryMode } from './024-delivery-mode.js';
+import { migration024 as migration024OpenCodeRegistration } from './024-opencode-registration-provisioning.js';
+import { migration025 as migration025DeliveryMode } from './025-delivery-mode.js';
 
 interface MigrationBase {
   version: number;

@@ -921,7 +921,26 @@ describe('createNewAgentGroup — disk-aware folder dedupe (A4)', () => {
     fs.mkdirSync(residue, { recursive: true });
     fs.writeFileSync(path.join(residue, 'memory.md'), 'old group memory\n');
 
-    const ag = await createNewAgentGroup('My Agent');
+    const ag = await createNewAgentGroup(
+      'My Agent',
+      {
+        id: 'provider-local',
+        name: 'Local',
+        provider_id: 'openai',
+        discovery_type: 'openai-compatible',
+        base_url: 'http://localhost:8000/v1',
+        models_url: null,
+        context_limit: 65536,
+        output_limit: 8192,
+        input_modalities: '',
+        delivery_mode: 'tools-only',
+        instructions: null,
+        enabled: 1,
+        created_at: now(),
+        updated_at: now(),
+      },
+      { id: 'openai/test', name: 'openai/test', contextLimit: 65536, outputLimit: 8192, inputModalities: '' },
+    );
 
     expect(ag.folder).toBe('my-agent-2');
     // Residue untouched.

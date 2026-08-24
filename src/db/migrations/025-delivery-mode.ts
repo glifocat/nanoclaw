@@ -10,7 +10,7 @@ import type { Migration } from './index.js';
  * NULL and resolve to the envelope contract, reproducing pre-migration
  * delivery exactly.
  */
-export const migration024: Migration = {
+export const migration025: Migration = {
   version: 25,
   name: 'delivery-mode',
   up(db) {

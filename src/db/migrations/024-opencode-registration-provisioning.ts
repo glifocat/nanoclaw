@@ -11,7 +11,7 @@ import type { Migration } from './index.js';
  * flow restart-safe. Existing rows resolve to `idle` and preserve the old
  * connect-existing/reject behavior.
  */
-export const migration023: Migration = {
+export const migration024: Migration = {
   version: 24,
   name: 'opencode-registration-provisioning',
   up(db) {
