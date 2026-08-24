@@ -1,6 +1,6 @@
 ---
 name: add-mattermost
-description: Add Mattermost channel integration via Chat SDK.
+description: Add Mattermost channel integration via Chat SDK, reusing a local or configured server when available and offering a local evaluation server when none exists.
 ---
 
 # Add Mattermost Channel
@@ -16,6 +16,34 @@ NanoClaw's webhook server (see **Interactive cards** below).
 > unrelated codebase with a different thread-id encoding; it cannot deliver
 > replies through the bridge and its card buttons are dead. If a previous
 > install pinned it, see **Migrating from `chat-adapter-mattermost@1.1.3`**.
+
+## Discover the server first
+
+Do this before installing the adapter or asking for a URL. The goal is to
+reuse a healthy Mattermost the user already has and establish one canonical
+base URL.
+
+1. Check an existing `MATTERMOST_BASE_URL` in the current environment and
+   NanoClaw env/config files. Do not print tokens or dump whole env files.
+2. Probe likely local URLs, at least `http://localhost:8065` and
+   `http://127.0.0.1:8065`, using `GET /api/v4/system/ping`. A listening port
+   alone is not evidence that the service is Mattermost.
+3. Inspect Docker/Compose for Mattermost containers. If a matching container
+   exists but is stopped, offer to start it; do not start or recreate it
+   without the user's approval.
+4. If one healthy server is found, tell the user and use it. If multiple
+   distinct servers are found, ask which one to use. Treat localhost and
+   127.0.0.1 endpoints for the same container as one server and prefer the
+   hostname in its configured Site URL; otherwise prefer `localhost`.
+5. If nothing local is found, ask whether the user has a remote Mattermost.
+   If not, offer the local evaluation installation in
+   [LOCAL_SERVER.md](LOCAL_SERVER.md). Read that file only for local server
+   discovery, repair, or installation.
+
+Set `MATTERMOST_BASE_URL` to the chosen canonical URL (scheme included, no
+trailing slash), then use that exact hostname in browser/Desktop setup. Do not
+silently install Mattermost: it runs containers, binds a port, and persists
+data, so show what will be created and get approval first.
 
 ## Install
 
@@ -185,6 +213,17 @@ Otherwise, run `/manage-channels` to wire this channel to an agent group.
 **A token or URL is rejected.** `MATTERMOST_BASE_URL` must include the scheme (`https://` or `http://`) and no trailing slash. The bot token is shown once at creation — regenerate it from System Console → Integrations → Bot Accounts → select the bot → "Create New Token" if lost (old tokens keep working until you deactivate them separately).
 
 **The bot never connects, or connects and repeatedly drops.** Check that `MATTERMOST_BASE_URL` is reachable from the host (not just from a browser behind a VPN or reverse-proxy auth) and that nothing in front of the server (load balancer, CDN) blocks or aggressively idle-times WebSocket upgrades to `/api/v4/websocket`. The adapter retries with backoff and NanoClaw's channel-registry retries adapter setup on network errors, but a very short idle timeout in front of the server will cause repeated reconnects. Check `logs/nanoclaw.error.log` for repeated adapter setup-retry warnings.
+
+**Desktop messages appear only after a manual refresh.** This is usually the
+Desktop client's WebSocket origin being rejected. Keep the Desktop server URL,
+`MATTERMOST_BASE_URL`, and Mattermost `ServiceSettings.SiteURL` on the same
+canonical hostname. Check server logs for `request origin not allowed`, and
+verify `/api/v4/websocket` returns `101 Switching Protocols` for that Origin.
+For a local server that genuinely needs both hostnames, persist a space-separated
+`ServiceSettings.AllowCorsFrom` containing `http://localhost:8065` and
+`http://127.0.0.1:8065`; do not use `*`. Preview images may regenerate
+`config.json` on restart, so make the setting part of container startup rather
+than relying on an in-container edit.
 
 **The bot can't see a channel or can't DM someone.** The bot account must be added as a member of any channel it should read/post in — bot accounts don't auto-join. For DMs, the target user must exist and be reachable via `/api/v4/channels/direct`.
 
