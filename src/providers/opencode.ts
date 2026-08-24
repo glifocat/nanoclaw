@@ -16,6 +16,7 @@ import path from 'path';
 
 import { DATA_DIR } from '../config.js';
 import { readEnvFile } from '../env.js';
+import { groupOpenCodeStateDir } from './opencode-auth.js';
 import { registerProviderContainerConfig } from './provider-container-registry.js';
 
 const PASSTHROUGH_KEYS = [
@@ -82,7 +83,7 @@ export function applyOpenCodeProviderSettings(
 
 registerProviderContainerConfig('opencode', (ctx) => {
   const opencodeParent = path.join(DATA_DIR, 'provider-state', 'opencode', 'groups');
-  const opencodeDir = path.join(opencodeParent, encodeURIComponent(ctx.agentGroupId));
+  const opencodeDir = groupOpenCodeStateDir(ctx.agentGroupId);
   const legacySessionDir = path.join(ctx.sessionDir, 'opencode-xdg');
   fs.mkdirSync(opencodeParent, { recursive: true, mode: 0o700 });
   if (!fs.existsSync(opencodeDir) && fs.existsSync(legacySessionDir)) {

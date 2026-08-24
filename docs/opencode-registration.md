@@ -7,8 +7,9 @@ The approval flow is:
 1. Choose **Connect new agent**.
 2. Reply with the agent name.
 3. Choose an OpenCode model provider.
-4. Choose a model discovered from that provider.
-5. Confirm creation and connection.
+4. For a native cloud provider, run the displayed host command to complete OpenCode's native `auth login` flow, then continue in the approval card. Custom OpenAI-compatible endpoints keep using OneCLI and skip this step.
+5. Choose a model discovered from that provider.
+6. Confirm creation and connection.
 
 Only the final confirmation creates the group. NanoClaw then initializes its filesystem, sets the agent provider to `opencode`, snapshots the selected provider and model settings into the group's container configuration, creates the channel wiring, and replays the message that triggered registration.
 
@@ -25,6 +26,8 @@ NanoClaw stores provider connections, not a model allowlist. A connection contai
 Connections never contain API keys. Provider credentials stay in OneCLI and are injected into matching outbound HTTP requests.
 
 Native OpenCode cloud credentials (including OAuth refresh tokens) are scoped to the agent group. OpenCode stores them in the group's private provider-state directory, which is mounted into every OpenCode session for that group. A new messaging session can therefore reuse and refresh the group's login, while another agent group cannot see it. Deleting an individual session does not delete the group's cloud login.
+
+During registration, the native login first writes to a private pending state root. NanoClaw will not offer cloud models until the selected provider appears in OpenCode's own `auth.json`. Final confirmation atomically moves that state root into the newly created group; cancellation removes it.
 
 For a built-in cloud provider, model discovery reads OpenCode's live Models.dev catalog:
 

@@ -755,6 +755,99 @@ describe('unknown-channel registration flow', () => {
     expect(stillPending).toBe(0);
   });
 
+  it('requires native cloud authentication before offering models', async () => {
+    const { routeInbound } = await import('../../router.js');
+    const { getResponseHandlers } = await import('../../response-registry.js');
+    const { pendingOpenCodeStateDir } = await import('../../providers/opencode-auth.js');
+    await getDb().run(
+      `INSERT INTO opencode_model_providers (
+         id, name, provider_id, discovery_type, input_modalities, enabled, created_at, updated_at
+       ) VALUES (?, ?, ?, 'models-dev', '', 1, ?, ?)`,
+      'provider-cloud',
+      'OpenAI cloud',
+      'openai',
+      now(),
+      now(),
+    );
+    vi.mocked(globalThis.fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          openai: {
+            models: {
+              'gpt-5.4': {
+                id: 'gpt-5.4',
+                name: 'GPT-5.4',
+                limit: { context: 128000, output: 32768 },
+                modalities: { input: ['text', 'image'], output: ['text'] },
+              },
+            },
+          },
+        }),
+      ),
+    );
+
+    await expectAsyncDelivery(() => routeInbound(groupMention('chat-cloud-auth')));
+    const pending = (await getDb().get<{ messaging_group_id: string }>(
+      'SELECT messaging_group_id FROM pending_channel_approvals',
+    ))!;
+    const click = async (value: string) => {
+      for (const handler of getResponseHandlers()) {
+        if (
+          await handler({
+            questionId: pending.messaging_group_id,
+            value,
+            userId: 'owner',
+            channelType: 'telegram',
+            platformId: 'dm-owner',
+            threadId: null,
+          })
+        )
+          break;
+      }
+    };
+    await click('new_agent');
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: 'dm-owner',
+      threadId: null,
+      message: {
+        id: 'cloud-name',
+        kind: 'chat' as const,
+        content: JSON.stringify({ senderId: 'owner', text: 'Cloudy' }),
+        timestamp: now(),
+      },
+    });
+    await click('opencode_provider:provider-cloud');
+
+    expect(
+      (
+        await getDb().get<{ provisioning_step: string }>(
+          'SELECT provisioning_step FROM pending_channel_approvals WHERE messaging_group_id = ?',
+          pending.messaging_group_id,
+        )
+      )?.provisioning_step,
+    ).toBe('awaiting_auth');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+
+    await click('opencode_auth_continue:provider-cloud');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+
+    const authRoot = pendingOpenCodeStateDir(pending.messaging_group_id);
+    fs.mkdirSync(path.join(authRoot, 'opencode'), { recursive: true });
+    fs.writeFileSync(path.join(authRoot, 'opencode', 'auth.json'), '{"openai":{"type":"oauth"}}');
+    await click('opencode_auth_continue:provider-cloud');
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        await getDb().get<{ provisioning_step: string }>(
+          'SELECT provisioning_step FROM pending_channel_approvals WHERE messaging_group_id = ?',
+          pending.messaging_group_id,
+        )
+      )?.provisioning_step,
+    ).toBe('awaiting_model');
+  });
+
   it('searches a live provider catalog before rendering a large model list', async () => {
     const { routeInbound } = await import('../../router.js');
     const { getResponseHandlers } = await import('../../response-registry.js');

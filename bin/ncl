@@ -24,4 +24,8 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT"
+if [[ "${1:-}" == "opencode" && "${2:-}" == "auth" ]]; then
+  shift 2
+  exec "$PROJECT_ROOT/bin/opencode-auth" "$@"
+fi
 exec pnpm exec tsx src/cli/client.ts "$@"

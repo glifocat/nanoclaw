@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REQUEST=""
+PROVIDER=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --request) REQUEST="${2:-}"; shift 2 ;;
+    --provider) PROVIDER="${2:-}"; shift 2 ;;
+    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+if [[ -z "$REQUEST" || -z "$PROVIDER" ]]; then
+  echo "Usage: ncl opencode auth --request <registration-id> --provider <provider-id>" >&2
+  exit 2
+fi
+if [[ ! "$REQUEST" =~ ^[A-Za-z0-9._:-]+$ || ! "$PROVIDER" =~ ^[A-Za-z0-9._:-]+$ ]]; then
+  echo "Registration and provider IDs may contain only letters, numbers, dot, underscore, colon, and hyphen." >&2
+  exit 2
+fi
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$PROJECT_ROOT/setup/lib/install-slug.sh"
+STATE_DIR="$PROJECT_ROOT/data/provider-state/opencode/pending/$REQUEST"
+IMAGE="$(container_image_base):latest"
+RUNTIME="${CONTAINER_RUNTIME:-docker}"
+mkdir -p "$STATE_DIR"
+chmod 700 "$STATE_DIR"
+
+exec "$RUNTIME" run --rm -it \
+  --user "$(id -u):$(id -g)" \
+  --entrypoint opencode \
+  -e XDG_DATA_HOME=/opencode-xdg \
+  -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+  -e http_proxy -e https_proxy -e no_proxy \
+  -v "$STATE_DIR:/opencode-xdg" \
+  "$IMAGE" auth login --provider "$PROVIDER"

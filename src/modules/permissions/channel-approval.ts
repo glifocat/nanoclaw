@@ -54,6 +54,7 @@ import { updateContainerConfigJson, updateContainerConfigScalars } from '../../d
 import { getDeliveryAdapter } from '../../delivery.js';
 import { groupFolderExistsOnDisk } from '../../group-folder.js';
 import { initGroupFilesystem } from '../../group-init.js';
+import { promotePendingOpenCodeState } from '../../providers/opencode-auth.js';
 import { log } from '../../log.js';
 import type { InboundEvent } from '../../channels/adapter.js';
 import type { AgentGroup, DiscoveredOpenCodeModel, MessagingGroup, OpenCodeModelProvider } from '../../types.js';
@@ -371,6 +372,7 @@ export async function createNewAgentGroup(
   name: string,
   modelProvider: OpenCodeModelProvider,
   model: DiscoveredOpenCodeModel,
+  pendingRequestId?: string,
 ): Promise<AgentGroup> {
   let folder = toFolder(name);
   const baseFolder = folder;
@@ -394,6 +396,7 @@ export async function createNewAgentGroup(
   });
 
   const ag = (await getAgentGroup(agId))!;
+  if (pendingRequestId) promotePendingOpenCodeState(pendingRequestId, ag.id);
   // OpenCode registration is a provisioning operation, not a later provider
   // flip: stamp the provider, connection instructions, model, delivery contract,
   // and a snapshot of every backend-specific setting before the first spawn.

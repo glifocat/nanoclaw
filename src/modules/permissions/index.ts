@@ -38,6 +38,7 @@ import { registerResponseHandler, type ResponsePayload } from '../../response-re
 import { getDeliveryAdapter } from '../../delivery.js';
 import { log } from '../../log.js';
 import { discoverOpenCodeModels } from '../../providers/opencode-model-discovery.js';
+import { hasOpenCodeProviderAuth, pendingOpenCodeStateDir } from '../../providers/opencode-auth.js';
 import type {
   AgentGroup,
   DiscoveredOpenCodeModel,
@@ -75,6 +76,7 @@ import { ensureUserDm } from './user-dm.js';
 
 const OPENCODE_PROVIDER_PREFIX = 'opencode_provider:';
 const OPENCODE_MODEL_PREFIX = 'opencode_model:';
+const OPENCODE_AUTH_CONTINUE_PREFIX = 'opencode_auth_continue:';
 const CONFIRM_NEW_AGENT_VALUE = 'confirm_new_agent';
 const CANCEL_NEW_AGENT_VALUE = 'cancel_new_agent';
 const MODEL_OPTION_LIMIT = 8;
@@ -744,6 +746,49 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
       await deletePendingChannelApproval(row.messaging_group_id);
       return true;
     }
+    if (modelProvider.discovery_type === 'models-dev') {
+      await updatePendingChannelProvisioning(row.messaging_group_id, {
+        provisioning_step: 'awaiting_auth',
+        selected_provider_id: modelProvider.id,
+        selected_model_id: null,
+      });
+      const delivered = await deliverRegistrationQuestion(
+        row,
+        '🔐 Authenticate OpenCode',
+        `On the NanoClaw host, run:\n\nncl opencode auth --request ${row.messaging_group_id} --provider ${modelProvider.provider_id}\n\nThen continue here.`,
+        [
+          {
+            label: "I've authenticated",
+            selectedLabel: '✅ Checking authentication…',
+            value: `${OPENCODE_AUTH_CONTINUE_PREFIX}${encodeURIComponent(modelProvider.id)}`,
+            style: 'primary',
+          },
+          { label: 'Cancel', selectedLabel: '🙅 Cancelled', value: CANCEL_NEW_AGENT_VALUE },
+        ],
+      );
+      if (!delivered) await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+    const models = await loadDiscoveredModels(row, modelProvider);
+    if (models) await offerDiscoveredModels(row, modelProvider, models);
+    return true;
+  }
+
+  if (payload.value.startsWith(OPENCODE_AUTH_CONTINUE_PREFIX)) {
+    if (row.provisioning_step !== 'awaiting_auth' || !row.selected_provider_id) return true;
+    const modelProvider = await getEnabledOpenCodeModelProvider(row.selected_provider_id);
+    if (!modelProvider) {
+      await deliverRegistrationText(row, 'That OpenCode provider is no longer available. Start again.');
+      await deletePendingChannelApproval(row.messaging_group_id);
+      return true;
+    }
+    if (!hasOpenCodeProviderAuth(pendingOpenCodeStateDir(row.messaging_group_id), modelProvider.provider_id)) {
+      await deliverRegistrationText(
+        row,
+        `OpenCode is not authenticated for ${modelProvider.name} yet. Run the host command, then try again.`,
+      );
+      return true;
+    }
     const models = await loadDiscoveredModels(row, modelProvider);
     if (models) await offerDiscoveredModels(row, modelProvider, models);
     return true;
@@ -845,7 +890,7 @@ async function handleChannelApprovalResponse(payload: ResponsePayload): Promise<
 
     let ag: AgentGroup;
     try {
-      ag = await createNewAgentGroup(row.new_agent_name, modelProvider, model);
+      ag = await createNewAgentGroup(row.new_agent_name, modelProvider, model, row.messaging_group_id);
     } catch (err) {
       log.error('Channel registration: OpenCode agent provisioning failed', {
         messagingGroupId: row.messaging_group_id,

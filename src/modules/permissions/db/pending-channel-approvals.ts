@@ -10,6 +10,7 @@
  * instead of spamming the owner.
  */
 import { getDb } from '../../../db/connection.js';
+import { removePendingOpenCodeState } from '../../../providers/opencode-auth.js';
 
 export interface PendingChannelApproval {
   messaging_group_id: string;
@@ -27,6 +28,7 @@ export interface PendingChannelApproval {
     | 'idle'
     | 'awaiting_name'
     | 'awaiting_provider'
+    | 'awaiting_auth'
     | 'awaiting_model_query'
     | 'awaiting_model'
     | 'awaiting_confirmation';
@@ -125,4 +127,5 @@ export async function getPendingTextInputForApprover(
 
 export async function deletePendingChannelApproval(messagingGroupId: string): Promise<void> {
   await getDb().run('DELETE FROM pending_channel_approvals WHERE messaging_group_id = ?', messagingGroupId);
+  removePendingOpenCodeState(messagingGroupId);
 }
