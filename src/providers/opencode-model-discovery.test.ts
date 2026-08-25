@@ -48,7 +48,14 @@ describe('OpenCode model discovery', () => {
         ),
     );
 
-    await expect(discoverOpenCodeModels(provider({ provider_id: 'google' }), fetchImpl)).resolves.toEqual([
+    const runtimeModelListImpl = vi.fn(async () => ['google/gemini-test']);
+    await expect(
+      discoverOpenCodeModels(provider({ provider_id: 'google' }), {
+        fetchImpl,
+        runtimeModelListImpl,
+        openCodeStateDir: '/tmp/opencode-state',
+      }),
+    ).resolves.toEqual([
       {
         id: 'google/gemini-test',
         name: 'Gemini Test',
@@ -61,6 +68,31 @@ describe('OpenCode model discovery', () => {
       'https://models.dev/api.json',
       expect.objectContaining({ headers: undefined }),
     );
+    expect(runtimeModelListImpl).toHaveBeenCalledWith('google', '/tmp/opencode-state');
+  });
+
+  it('does not offer catalog models missing from the pinned OpenCode runtime', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            openai: {
+              models: {
+                supported: { id: 'gpt-supported', limit: { context: 1000 } },
+                unsupported: { id: 'gpt-catalog-only', limit: { context: 1000 } },
+              },
+            },
+          }),
+        ),
+    );
+
+    const models = await discoverOpenCodeModels(provider(), {
+      fetchImpl,
+      runtimeModelListImpl: async () => ['openai/gpt-supported'],
+      openCodeStateDir: '/tmp/opencode-state',
+    });
+
+    expect(models.map((model) => model.id)).toEqual(['openai/gpt-supported']);
   });
 
   it('queries a custom provider /models endpoint through the OneCLI placeholder credential', async () => {
@@ -76,7 +108,7 @@ describe('OpenCode model discovery', () => {
         output_limit: 8192,
         input_modalities: 'text,image',
       }),
-      fetchImpl,
+      { fetchImpl },
     );
 
     expect(models).toEqual([
@@ -102,7 +134,7 @@ describe('OpenCode model discovery', () => {
         base_url: 'https://api.example.test/v1',
         models_url: 'https://catalog.example.test/models',
       }),
-      fetchImpl,
+      { fetchImpl },
     );
     expect(fetchImpl).toHaveBeenCalledWith('https://catalog.example.test/models', expect.any(Object));
   });
@@ -114,8 +146,7 @@ describe('OpenCode model discovery', () => {
         discovery_type: 'openai-compatible',
         base_url: 'https://secured.example.test/v1',
       }),
-      undefined,
-      oneCliFetchImpl,
+      { oneCliFetchImpl },
     );
 
     expect(oneCliFetchImpl).toHaveBeenCalledWith('https://secured.example.test/v1/models');

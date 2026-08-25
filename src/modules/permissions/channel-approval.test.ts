@@ -49,6 +49,10 @@ vi.mock('child_process', async (importOriginal) => {
         _options: Record<string, unknown>,
         callback: (error: Error | null, stdout: string, stderr: string) => void,
       ) => {
+        if (args.includes('models')) {
+          callback(null, 'openai/gpt-5.4\n', '');
+          return {};
+        }
         void globalThis
           .fetch(args.at(-1) ?? '')
           .then(async (response) => callback(null, await response.text(), ''))

@@ -1,5 +1,7 @@
 import { execFile } from 'child_process';
 
+import { CONTAINER_IMAGE } from '../config.js';
+import { CONTAINER_RUNTIME_BIN } from '../container-runtime.js';
 import type { DiscoveredOpenCodeModel, OpenCodeModelProvider } from '../types.js';
 
 const MODELS_DEV_URL = 'https://models.dev/api.json';
@@ -7,6 +9,14 @@ const MAX_DISCOVERY_BYTES = 8 * 1024 * 1024;
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type JsonFetchLike = (url: string) => Promise<unknown>;
+type RuntimeModelListLike = (providerId: string, stateDir: string) => Promise<string[]>;
+
+interface DiscoveryOptions {
+  fetchImpl?: FetchLike;
+  oneCliFetchImpl?: JsonFetchLike;
+  runtimeModelListImpl?: RuntimeModelListLike;
+  openCodeStateDir?: string;
+}
 
 function positiveInteger(value: unknown): number | null {
   const number = Number(value);
@@ -93,6 +103,60 @@ function fullModelId(providerId: string, modelId: string): string {
   return `${providerId}/${modelId}`;
 }
 
+/** Ask the pinned OpenCode runtime which models it can actually resolve. */
+function listRuntimeModels(providerId: string, stateDir: string): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const uid = typeof process.getuid === 'function' ? process.getuid() : 1000;
+    const gid = typeof process.getgid === 'function' ? process.getgid() : 1000;
+    execFile(
+      CONTAINER_RUNTIME_BIN,
+      [
+        'run',
+        '--rm',
+        '--user',
+        `${uid}:${gid}`,
+        '--entrypoint',
+        'opencode',
+        '-e',
+        'HOME=/tmp',
+        '-e',
+        'XDG_CACHE_HOME=/tmp/opencode-cache',
+        '-e',
+        'XDG_DATA_HOME=/opencode-xdg',
+        '-e',
+        'HTTP_PROXY',
+        '-e',
+        'HTTPS_PROXY',
+        '-e',
+        'NO_PROXY',
+        '-v',
+        `${stateDir}:/opencode-xdg`,
+        CONTAINER_IMAGE,
+        'models',
+        providerId,
+        '--pure',
+      ],
+      { encoding: 'utf8', maxBuffer: MAX_DISCOVERY_BYTES, timeout: 30_000 },
+      (error, stdout) => {
+        if (error) {
+          reject(new Error('model discovery through the OpenCode runtime failed'));
+          return;
+        }
+        const prefix = `${providerId}/`;
+        const ids = stdout
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.startsWith(prefix));
+        if (ids.length === 0) {
+          reject(new Error(`OpenCode returned no models for provider ${providerId}`));
+          return;
+        }
+        resolve([...new Set(ids)]);
+      },
+    );
+  });
+}
+
 function discoverFromModelsDev(provider: OpenCodeModelProvider, payload: unknown): DiscoveredOpenCodeModel[] {
   if (typeof payload !== 'object' || payload === null) throw new Error('Models.dev returned an invalid catalog');
   const entry = (payload as Record<string, unknown>)[provider.provider_id];
@@ -171,18 +235,26 @@ function modelListUrl(provider: OpenCodeModelProvider): string {
 /** Discover selectable models without storing a NanoClaw model allowlist. */
 export async function discoverOpenCodeModels(
   provider: OpenCodeModelProvider,
-  fetchImpl?: FetchLike,
-  oneCliFetchImpl: JsonFetchLike = fetchJsonViaOneCli,
+  options: DiscoveryOptions = {},
 ): Promise<DiscoveredOpenCodeModel[]> {
-  const models =
-    provider.discovery_type === 'openai-compatible'
-      ? discoverFromOpenAiEndpoint(
-          provider,
-          fetchImpl
-            ? await fetchJson(modelListUrl(provider), true, fetchImpl)
-            : await oneCliFetchImpl(modelListUrl(provider)),
-        )
-      : discoverFromModelsDev(provider, await fetchJson(MODELS_DEV_URL, false, fetchImpl ?? globalThis.fetch));
+  const { fetchImpl, oneCliFetchImpl = fetchJsonViaOneCli, runtimeModelListImpl = listRuntimeModels } = options;
+  let models: DiscoveredOpenCodeModel[];
+  if (provider.discovery_type === 'openai-compatible') {
+    models = discoverFromOpenAiEndpoint(
+      provider,
+      fetchImpl
+        ? await fetchJson(modelListUrl(provider), true, fetchImpl)
+        : await oneCliFetchImpl(modelListUrl(provider)),
+    );
+  } else {
+    if (!options.openCodeStateDir) throw new Error('OpenCode model discovery requires authenticated runtime state');
+    const [catalog, runtimeIds] = await Promise.all([
+      fetchJson(MODELS_DEV_URL, false, fetchImpl ?? globalThis.fetch),
+      runtimeModelListImpl(provider.provider_id, options.openCodeStateDir),
+    ]);
+    const allowed = new Set(runtimeIds);
+    models = discoverFromModelsDev(provider, catalog).filter((model) => allowed.has(model.id));
+  }
   if (models.length === 0) throw new Error(`No text models were discovered for ${provider.name}`);
   return models;
 }

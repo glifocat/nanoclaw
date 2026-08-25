@@ -421,7 +421,10 @@ async function loadDiscoveredModels(
   provider: OpenCodeModelProvider,
 ): Promise<DiscoveredOpenCodeModel[] | null> {
   try {
-    return await discoverOpenCodeModels(provider);
+    return await discoverOpenCodeModels(provider, {
+      openCodeStateDir:
+        provider.discovery_type === 'models-dev' ? pendingOpenCodeStateDir(row.messaging_group_id) : undefined,
+    });
   } catch (err) {
     log.error('Channel registration: OpenCode model discovery failed', {
       messagingGroupId: row.messaging_group_id,
