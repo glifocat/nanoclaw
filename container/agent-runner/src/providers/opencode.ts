@@ -3,10 +3,8 @@ import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
 
 import { createOpencodeClient, type FilePartInput, type OpencodeClient } from '@opencode-ai/sdk';
-// The root `@opencode-ai/sdk` client (pinned ^1.4.3, resolves 1.4.11 on this
-// branch) has no `.question` surface at all — reply/reject/list for the
-// interactive `question` tool only exist on the `/v2` subpath client (present
-// in both 1.4.11 and 1.4.17; verified via `npm pack` .d.ts). Import it
+// The root client has no `.question` surface; reply/reject/list for the
+// interactive `question` tool live on the `/v2` subpath client. Import it
 // separately so the session/event client above is untouched.
 import { createOpencodeClient as createOpencodeQuestionClient } from '@opencode-ai/sdk/v2';
 

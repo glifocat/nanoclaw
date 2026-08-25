@@ -17,6 +17,7 @@ describe('OpenCode CLI and SDK pins', () => {
   const tools = JSON.parse(fs.readFileSync(path.join(root, 'container', 'cli-tools.json'), 'utf8')) as Array<{
     name: string;
     version: string;
+    onlyBuilt?: boolean;
   }>;
   const runner = JSON.parse(fs.readFileSync(path.join(root, 'container', 'agent-runner', 'package.json'), 'utf8')) as {
     dependencies?: Record<string, string>;
@@ -25,6 +26,7 @@ describe('OpenCode CLI and SDK pins', () => {
   it('installs opencode-ai from the pinned global CLI manifest', () => {
     const entry = tools.find((tool) => tool.name === 'opencode-ai');
     expect(entry?.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(entry?.onlyBuilt).toBe(true);
   });
 
   it('keeps the global CLI and agent-runner SDK on the same exact version', () => {

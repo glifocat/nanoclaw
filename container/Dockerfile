@@ -24,7 +24,7 @@ ARG INSTALL_CJK_FONTS=false
 ARG BUN_VERSION=1.3.12
 # Must match the @opencode-ai/sdk version in container/agent-runner/package.json.
 # Never use `latest` — the CLI and SDK share a session API and must stay in lockstep.
-ARG OPENCODE_VERSION=1.4.17
+ARG OPENCODE_VERSION=1.18.21
 
 # ---- System dependencies -----------------------------------------------------
 # tini: correct PID 1 / signal forwarding so outbound.db writes finalize on

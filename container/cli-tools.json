@@ -11,6 +11,7 @@
   },
   {
     "name": "opencode-ai",
-    "version": "1.4.17"
+    "version": "1.18.21",
+    "onlyBuilt": true
   }
 ]
